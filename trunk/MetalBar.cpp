@@ -36,8 +36,10 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, Te
 	m_horizBar = horizBar;
 
 	m_doc = doc;
+	m_doc->AddRef();
 	m_numLines = 0;
 
+	m_codeImgDirty = true;
 	m_codeImg = 0;
 	m_imgDC = 0;
 	m_backBufferImg = 0;
@@ -363,8 +365,11 @@ void MetalBar::RenderCodeImg()
 
 void MetalBar::OnPaint(HDC ctrlDC)
 {
-	// FIXME: don't do this unless the code changes.
-	RenderCodeImg();
+	if(!m_codeImg || m_codeImgDirty)
+	{
+		RenderCodeImg();
+		m_codeImgDirty = false;
+	}
 
 	BLENDFUNCTION blendFunc;
 	blendFunc.BlendOp = AC_SRC_OVER;
@@ -449,4 +454,10 @@ void MetalBar::OnPaint(HDC ctrlDC)
 
 	// Blit the backbuffer onto the control.
 	BitBlt(ctrlDC, clRect.left, clRect.top, s_barWidth, barHeight, m_backBufferDC, 0, 0, SRCCOPY);
+}
+
+void MetalBar::OnCodeChanged(TextPoint* /*startPoint*/, TextPoint* /*endPoint*/)
+{
+	m_codeImgDirty = true;
+	InvalidateRect(m_hwnd, 0, 0);
 }
