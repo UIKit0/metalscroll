@@ -24,7 +24,8 @@ public:
 	MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, TextDocument* doc);
 	~MetalBar();
 
-	LRESULT WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	LRESULT		WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	void		OnCodeChanged(TextPoint* startPoint, TextPoint* endPoint);
 
 private:
 	// User-controllable parameters.
@@ -50,6 +51,7 @@ private:
 	long					m_numLines;
 
 	// Painting.
+	bool					m_codeImgDirty;
 	HBITMAP					m_codeImg;
 	HDC						m_imgDC;
 	HBITMAP					m_backBufferImg;

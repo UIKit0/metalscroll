@@ -39,8 +39,14 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 	hr = events->get_WindowEvents(0, (_WindowEvents**)&m_wndEvents);
 	if(FAILED(hr) || !m_wndEvents)
 		return hr;
-
 	hr = IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispWindowEvents)>::DispEventAdvise(m_wndEvents);
+	if(FAILED(hr))
+		return hr;
+
+	hr = events->get_TextEditorEvents(0, (_TextEditorEvents**)&m_textEditorEvents);
+	if(FAILED(hr) || !m_textEditorEvents)
+		return hr;
+	hr = IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispTextEditorEvents)>::DispEventAdvise(m_textEditorEvents);
 	if(FAILED(hr))
 		return hr;
 	
@@ -53,6 +59,12 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 	{
 		IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispWindowEvents)>::DispEventUnadvise(m_wndEvents);
 		m_wndEvents = 0;
+	}
+
+	if(m_textEditorEvents)
+	{
+		IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispTextEditorEvents)>::DispEventUnadvise(m_textEditorEvents);
+		m_textEditorEvents = 0;
 	}
 
 	// FIXME: delete all the bars so the window procedures get unhooked.
@@ -137,6 +149,13 @@ static LRESULT FAR PASCAL ScrollBarProc(HWND hwnd, UINT message, WPARAM wparam, 
 	return bar->WndProc(hwnd, message, wparam, lparam);
 }
 
+struct ScrollBarUpdateData
+{
+	TextDocument*	textDoc;
+	TextPoint*		changeStartPoint;
+	TextPoint*		changeEndPoint;
+};
+
 static BOOL CALLBACK CheckEditorPanels(HWND hwnd, LPARAM param)
 {
 	wchar_t className[64];
@@ -150,47 +169,30 @@ static BOOL CALLBACK CheckEditorPanels(HWND hwnd, LPARAM param)
 	if(!handles.editor || !handles.vertScroll || !handles.horizScroll)
 		return TRUE;
 
-	// Check if it's already subclassed.
-	::LONG_PTR userData = GetWindowLongPtr(handles.vertScroll, GWL_USERDATA);
-	if(userData)
-		return TRUE;
+	ScrollBarUpdateData* updData = (ScrollBarUpdateData*)param;
 
-	// Install our own window procedure.
-	WNDPROC oldProc = (WNDPROC)SetWindowLongPtr(handles.vertScroll, GWLP_WNDPROC, (::LONG_PTR)ScrollBarProc);
-	MetalBar* newBar = new MetalBar(handles.vertScroll, handles.editor, handles.horizScroll, oldProc, (TextDocument*)param);
-	SetWindowLongPtr(handles.vertScroll, GWL_USERDATA, (::LONG_PTR)newBar);
+	// Check if it's already subclassed.
+	::LONG_PTR wndData = GetWindowLongPtr(handles.vertScroll, GWL_USERDATA);
+	MetalBar* bar;
+	if(!wndData)
+	{
+		// Install our own window procedure.
+		WNDPROC oldProc = (WNDPROC)SetWindowLongPtr(handles.vertScroll, GWLP_WNDPROC, (::LONG_PTR)ScrollBarProc);
+		bar = new MetalBar(handles.vertScroll, handles.editor, handles.horizScroll, oldProc, updData->textDoc);
+		SetWindowLongPtr(handles.vertScroll, GWL_USERDATA, (::LONG_PTR)bar);
+	}
+	else
+		bar = (MetalBar*)wndData;
+
+	if(updData->changeStartPoint && updData->changeEndPoint)
+		bar->OnCodeChanged(updData->changeStartPoint, updData->changeEndPoint);
 
 	// Continue walking the child list.
 	return TRUE;
 }
 
-void CConnect::CheckWindow(Window* window)
+void CConnect::CreateOrUpdateScrollBars(Window* window, TextDocument* textDoc, TextPoint* changeStartPoint, TextPoint* changeEndPoint)
 {
-	// See if it's a code window.
-	CComBSTR kind;
-	HRESULT hr = window->get_ObjectKind(&kind);
-	if(FAILED(hr))
-		return;
-
-	if(kind != vsDocumentKindText)
-		return;
-
-	// The the TextDocument object from it.
-	CComPtr<Document> doc;
-	hr = window->get_Document(&doc);
-	if(FAILED(hr) || !doc)
-		return;
-
-	CComPtr<IDispatch> disp;
-	hr = doc->Object(L"TextDocument", &disp);
-	if(FAILED(hr) || !disp)
-		return;
-
-	TextDocument* textDoc = 0;
-	hr = disp->QueryInterface(__uuidof(TextDocument), (void**)&textDoc);
-	if(FAILED(hr) || !textDoc)
-		return;
-
 	// The little shit won't give up its HWND the nice way (via get_HWnd()). Alt+8 to the rescue!
 	// Luckily, get_HWnd() is a tiny function. Right at the start, it checks if an int at offset
 	// 0x4c in the object is 0. If it's 0, it returns the handle, which is at offset 0x48 in the object.
@@ -216,5 +218,58 @@ void CConnect::CheckWindow(Window* window)
 		return;
 
 	// Now check all the children with class "VsEditPane".
-	EnumChildWindows(splitterHwnd, CheckEditorPanels, (LPARAM)textDoc);
+	ScrollBarUpdateData updData;
+	updData.textDoc = textDoc;
+	updData.changeStartPoint = changeStartPoint;
+	updData.changeEndPoint = changeEndPoint;
+	EnumChildWindows(splitterHwnd, CheckEditorPanels, (LPARAM)&updData);
+}
+
+void CConnect::CheckWindow(Window* window)
+{
+	// See if it's a code window.
+	CComBSTR kind;
+	HRESULT hr = window->get_ObjectKind(&kind);
+	if(FAILED(hr))
+		return;
+
+	if(kind != vsDocumentKindText)
+		return;
+
+	// The the TextDocument object from it.
+	CComPtr<Document> doc;
+	hr = window->get_Document(&doc);
+	if(FAILED(hr) || !doc)
+		return;
+
+	CComPtr<IDispatch> disp;
+	hr = doc->Object(L"TextDocument", &disp);
+	if(FAILED(hr) || !disp)
+		return;
+
+	CComQIPtr<TextDocument> textDoc = disp;
+	if(!textDoc)
+		return;
+
+	CreateOrUpdateScrollBars(window, textDoc, 0, 0);
+}
+
+void CConnect::OnLineChanged(TextPoint* startPoint, TextPoint* endPoint, long /*hint*/)
+{
+	CComPtr<TextDocument> textDoc;
+	HRESULT hr = startPoint->get_Parent(&textDoc);
+	if(FAILED(hr) || !textDoc)
+		return;
+
+	CComPtr<Document> doc;
+	hr = textDoc->get_Parent(&doc);
+	if(FAILED(hr) || !doc)
+		return;
+
+	CComPtr<Window> wnd;
+	hr = doc->get_ActiveWindow(&wnd);
+	if(FAILED(hr) || !wnd)
+		return;
+
+	CreateOrUpdateScrollBars(wnd, textDoc, startPoint, endPoint);
 }

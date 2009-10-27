@@ -25,7 +25,8 @@ class ATL_NO_VTABLE CConnect :
 	public CComObjectRootEx<CComSingleThreadModel>,
 	public CComCoClass<CConnect, &CLSID_Connect>,
 	public IDispatchImpl<_IDTExtensibility2, &IID__IDTExtensibility2, &LIBID_AddInDesignerObjects, 1, 0>,
-	public IDispEventImpl<1, CConnect, &__uuidof(_dispWindowEvents), &LIBID_EnvDTE, 8, 0>
+	public IDispEventImpl<1, CConnect, &__uuidof(_dispWindowEvents), &LIBID_EnvDTE, 8, 0>,
+	public IDispEventImpl<1, CConnect, &__uuidof(_dispTextEditorEvents), &LIBID_EnvDTE, 8, 0>
 {
 public:
 	CConnect()
@@ -43,6 +44,7 @@ END_COM_MAP()
 BEGIN_SINK_MAP(CConnect)
 	SINK_ENTRY_EX(1, __uuidof(_dispWindowEvents), 3, OnWindowActivated)
 	SINK_ENTRY_EX(1, __uuidof(_dispWindowEvents), 4, OnWindowCreated)
+	SINK_ENTRY_EX(1, __uuidof(_dispTextEditorEvents), 1, OnLineChanged)
 END_SINK_MAP()
 
 	DECLARE_PROTECT_FINAL_CONSTRUCT()
@@ -56,22 +58,25 @@ END_SINK_MAP()
 	{
 	}
 
-public:
 	STDMETHOD(OnConnection)(IDispatch* application, ext_ConnectMode connectMode, IDispatch* addInInst, SAFEARRAY** custom);
 	STDMETHOD(OnDisconnection)(ext_DisconnectMode removeMode, SAFEARRAY** custom);
 	STDMETHOD(OnAddInsUpdate)(SAFEARRAY** custom);
 	STDMETHOD(OnStartupComplete)(SAFEARRAY** custom);
 	STDMETHOD(OnBeginShutdown)(SAFEARRAY** custom);
 
-	void __stdcall			OnWindowActivated(Window* gotFocus, Window* lostFocus);
-	void __stdcall			OnWindowCreated(Window* window);
+	void __stdcall				OnWindowActivated(Window* gotFocus, Window* lostFocus);
+	void __stdcall				OnWindowCreated(Window* window);
+	void __stdcall				OnLineChanged(TextPoint* startPoint, TextPoint* endPoint, long hint);
 
 private:
-	CComPtr<DTE2>			m_dte;
-	CComPtr<AddIn>			m_addInInstance;
-	CComPtr<_WindowEvents>	m_wndEvents;
+	CComPtr<DTE2>				m_dte;
+	CComPtr<AddIn>				m_addInInstance;
 
-	void					CheckWindow(Window* window);
+	CComPtr<_WindowEvents>		m_wndEvents;
+	CComPtr<_TextEditorEvents>	m_textEditorEvents;
+
+	void						CreateOrUpdateScrollBars(Window* window, TextDocument* textDoc, TextPoint* changeStartPoint, TextPoint* changeEndPoint);
+	void						CheckWindow(Window* window);
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(Connect), CConnect)
