@@ -437,8 +437,10 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	float normFact = 1.0f * imgHeight / range;
 	int normalizedCursor = int(cursor * normFact);
 	int normalizedPage = int(m_pageSize * normFact);
+	if(normalizedPage > barHeight)
+		normalizedPage = barHeight;
 	if(clRect.top + normalizedCursor + normalizedPage > clRect.bottom)
-		normalizedCursor = clRect.bottom - clRect.top - normalizedPage;
+		normalizedCursor = barHeight - normalizedPage;
 
 	// Overlay the current page marker. Since the bitmap is upside down, we must flip the cursor.
 	unsigned char* end = (unsigned char*)(m_backBufferBits + (barHeight - normalizedCursor) * s_barWidth);
