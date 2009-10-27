@@ -24,21 +24,28 @@ public:
 	MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, TextDocument* doc);
 	~MetalBar();
 
-	LRESULT		WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
-	void		OnCodeChanged(TextPoint* startPoint, TextPoint* endPoint);
+	LRESULT					WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	void					OnCodeChanged(TextPoint* startPoint, TextPoint* endPoint);
 
-private:
+	static void				ResetSettings();
+	static void				ReadSettings();
+	static void				SaveSettings();
+
 	// User-controllable parameters.
 	static unsigned int		s_barWidth;
 	static unsigned int		s_whitespaceColor;
 	static unsigned int		s_upperCaseColor;
 	static unsigned int		s_characterColor;
 	static unsigned int		s_commentColor;
-	static unsigned char	s_pageColor[3];
-	static unsigned char	s_pageOpacity;
+	static unsigned char	s_cursorColor[3];
+	static unsigned int		s_cursorOpacity;
 	static unsigned int		s_matchColor;
-	static unsigned int		s_addedLineColor;
+	static unsigned int		s_modifiedLineColor;
 	static unsigned int		s_unsavedLineColor;
+
+private:
+	static bool				ReadRegInt(unsigned int* to, HKEY key, const char* name);
+	static void				WriteRegInt(HKEY key, const char* name, unsigned int val);
 
 	// Handles and other window-related stuff.
 	WNDPROC					m_oldProc;

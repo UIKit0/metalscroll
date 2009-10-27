@@ -18,6 +18,7 @@
 #include "AddIn.h"
 #include "Connect.h"
 #include "MetalBar.h"
+#include "ColorChip.h"
 
 extern CAddInModule _AtlModule;
 
@@ -50,6 +51,9 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 	if(FAILED(hr))
 		return hr;
 	
+	MetalBar::ReadSettings();
+	ColorChip::Register();
+
 	return S_OK;
 }
 
@@ -71,6 +75,9 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 
 	m_dte = 0;
 	m_addInInstance = 0;
+
+	ColorChip::Unregister();
+
 	return S_OK;
 }
 

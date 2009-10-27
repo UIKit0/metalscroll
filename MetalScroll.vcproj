@@ -4,6 +4,7 @@
 	Version="9.00"
 	Name="MetalScroll"
 	ProjectGUID="{87C4E4F6-E6E1-4F7B-B1E9-C46B4E70200C}"
+	RootNamespace="MetalScroll"
 	Keyword="AtlProj"
 	TargetFrameworkVersion="0"
 	>
@@ -220,6 +221,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\ColorChip.cpp"
+				>
+			</File>
+			<File
 				RelativePath="Connect.cpp"
 				>
 			</File>
@@ -247,12 +252,20 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\OptionsDialog.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath=".\ColorChip.h"
+				>
+			</File>
 			<File
 				RelativePath="Connect.h"
 				>
@@ -263,6 +276,10 @@
 			</File>
 			<File
 				RelativePath=".\MetalScrollPCH.h"
+				>
+			</File>
+			<File
+				RelativePath=".\OptionsDialog.h"
 				>
 			</File>
 			<File

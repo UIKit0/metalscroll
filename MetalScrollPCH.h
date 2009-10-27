@@ -20,9 +20,11 @@
 #define STRICT
 #endif
 
-#define WINVER 0x0500
-#define _WIN32_WINNT 0x0500
-#define _WIN32_IE 0x0500
+#define WINVER						0x0500
+#define _WIN32_WINNT				0x0500
+#define _WIN32_IE					0x0500
+#define _SECURE_SCL					0
+#define _CRT_SECURE_NO_DEPRECATE
 
 #define _ATL_APARTMENT_THREADED
 #define _ATL_NO_AUTOMATIC_NAMESPACE
@@ -31,6 +33,7 @@
 
 #include <atlbase.h>
 #include <atlcom.h>
+#include <commctrl.h> 
 
 #pragma warning( disable : 4278 )
 #pragma warning( disable : 4146 )
@@ -77,5 +80,8 @@ public:
 private:
 	HINSTANCE m_hInstance;
 };
+
+#define RGB_TO_COLORREF(rgb) ((rgb & 0xff00) | ((rgb & 0xff) << 16) | ((rgb & 0xff0000) >> 16))
+#define COLORREF_TO_RGB(cr) ((cr & 0xff00) | ((cr & 0xff) << 16) | ((cr & 0xff0000) >> 16) | 0xff000000)
 
 extern CAddInModule _AtlModule;
