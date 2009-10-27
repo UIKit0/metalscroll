@@ -1,0 +1,67 @@
+HKCR
+{
+	MetalScroll.Connect.1 = s 'Connect Class'
+	{
+		CLSID = s '{4982020C-DFD7-4928-A1C7-DA5F154973BC}'
+	}
+	MetalScroll.Connect = s 'Connect Class'
+	{
+		CLSID = s '{4982020C-DFD7-4928-A1C7-DA5F154973BC}'
+		CurVer = s 'MetalScroll.Connect.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove '{4982020C-DFD7-4928-A1C7-DA5F154973BC}' = s 'Connect Class'
+		{
+			ProgID = s 'MetalScroll.Connect.1'
+			VersionIndependentProgID = s 'MetalScroll.Connect'
+			ForceRemove 'Programmable'
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Apartment'
+			}
+			'TypeLib' = s '{694BCCDA-B2B0-4A97-BB4B-E7B128B05D76}'
+		}
+	}
+}
+
+HKLM
+{
+	NoRemove 'SOFTWARE'
+	{
+		NoRemove 'Microsoft'
+		{
+			NoRemove 'VisualStudio'
+			{
+				NoRemove '8.0'
+				{
+					NoRemove 'AddIns'
+					{
+						ForceRemove 'MetalScroll.Connect'
+						{
+							val LoadBehavior = d 1
+							val CommandLineSafe = d 0
+							val CommandPreload = d 0
+							val FriendlyName = s 'MetalScroll'
+							val Description = s 'Another scrollbar replacement for code windows.'
+						}
+					}
+				}
+				NoRemove '9.0'
+				{
+					NoRemove 'AddIns'
+					{
+						ForceRemove 'MetalScroll.Connect'
+						{
+							val LoadBehavior = d 0
+							val CommandLineSafe = d 0
+							val CommandPreload = d 0
+							val FriendlyName = s 'MetalScroll'
+							val Description = s 'Another scrollbar replacement for code windows.'
+						}
+					}
+				}
+			}
+		}
+	}
+}
