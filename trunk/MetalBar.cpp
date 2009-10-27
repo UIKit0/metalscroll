@@ -16,17 +16,18 @@
 
 #include "MetalScrollPCH.h"
 #include "MetalBar.h"
+#include "OptionsDialog.h"
 
-unsigned int MetalBar::s_barWidth = 64;
-unsigned int MetalBar::s_whitespaceColor = 0xfff5f5f5;
-unsigned int MetalBar::s_upperCaseColor = 0xff101010;
-unsigned int MetalBar::s_characterColor = 0xff808080;
-unsigned int MetalBar::s_commentColor = 0xff008000;
-unsigned char MetalBar::s_pageColor[3] = { 0x28, 0x00, 0x00 };
-unsigned char MetalBar::s_pageOpacity = 224;
-unsigned int MetalBar::s_matchColor = 0xffd7f600;
-unsigned int MetalBar::s_addedLineColor = 0xff0000ff;
-unsigned int MetalBar::s_unsavedLineColor = 0xffe1621e;
+unsigned int MetalBar::s_barWidth;
+unsigned int MetalBar::s_whitespaceColor;
+unsigned int MetalBar::s_upperCaseColor;
+unsigned int MetalBar::s_characterColor;
+unsigned int MetalBar::s_commentColor;
+unsigned char MetalBar::s_cursorColor[3];
+unsigned int MetalBar::s_cursorOpacity;
+unsigned int MetalBar::s_matchColor;
+unsigned int MetalBar::s_modifiedLineColor;
+unsigned int MetalBar::s_unsavedLineColor;
 
 MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, TextDocument* doc)
 {
@@ -221,7 +222,16 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			return 0;
 
 		case WM_LBUTTONDBLCLK:
+		{
+			CComPtr<_DTE> dte;
+			HRESULT hr = m_doc->get_DTE(&dte);
+			if(SUCCEEDED(hr) && dte)
+			{
+				OptionsDialog dlg;
+				dlg.Execute(dte);
+			}
 			return 0;
+		}
 	}
 
 	return CallWindowProc(oldProc, hwnd, message, wparam, lparam);
@@ -409,12 +419,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		// Blit the code image and fill the remaining space with the whitespace color.
 		imgHeight = m_numLines;
 		BitBlt(m_backBufferDC, clRect.left, clRect.top, s_barWidth, m_numLines, m_imgDC, 0, 0, SRCCOPY);
-		// GDI has R and B flipped and wants alpha to be 0.
-		COLORREF fillColor =
-			(s_whitespaceColor & 0xff00) |
-			( (s_whitespaceColor & 0xff) << 16) |
-			( (s_whitespaceColor & 0xff0000) >> 16);
-		COLORREF oldColor = SetBkColor(m_backBufferDC, fillColor);
+		COLORREF oldColor = SetBkColor(m_backBufferDC, RGB_TO_COLORREF(s_whitespaceColor));
 		RECT remainingRect;
 		remainingRect.left = clRect.left;
 		remainingRect.right = clRect.right;
@@ -449,7 +454,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	{
 		for(int i = 0; i < 3; ++i)
 		{
-			int p = (s_pageOpacity*pixel[i])/255 + s_pageColor[i];
+			int p = (s_cursorOpacity*pixel[i])/255 + s_cursorColor[i];
 			pixel[i] = (p <= 255) ? (unsigned char)p : 255;
 		}
 	}
@@ -462,4 +467,95 @@ void MetalBar::OnCodeChanged(TextPoint* /*startPoint*/, TextPoint* /*endPoint*/)
 {
 	m_codeImgDirty = true;
 	InvalidateRect(m_hwnd, 0, 0);
+}
+
+void MetalBar::ResetSettings()
+{
+	s_barWidth = 64;
+	s_whitespaceColor = 0xfff5f5f5;
+	s_upperCaseColor = 0xff101010;
+	s_characterColor = 0xff808080;
+	s_commentColor = 0xff008000;
+	s_cursorColor[0] = 0x28;
+	s_cursorColor[1] = 0x00;
+	s_cursorColor[2] = 0x00;
+	s_cursorOpacity = 224;
+	s_matchColor = 0xffd7f600;
+	s_modifiedLineColor = 0xff0000ff;
+	s_unsavedLineColor = 0xffe1621e;
+}
+
+bool MetalBar::ReadRegInt(unsigned int* to, HKEY key, const char* name)
+{
+	unsigned int val;
+	DWORD type = REG_DWORD;
+	DWORD size = sizeof(val);
+	if(RegQueryValueExA(key, name, 0, &type, (LPBYTE)&val, &size) != ERROR_SUCCESS)
+		return false;
+
+	if(type != REG_DWORD)
+		return false;
+
+	*to = val;
+	return true;
+}
+
+void MetalBar::ReadSettings()
+{
+	// Make sure we have sane defaults, in case stuff is missing.
+	ResetSettings();
+
+	HKEY key;
+	// We can't use the constant HKEY_CURRENT_USER because some retard felt the need to define ULONG_PTR inside the EnvDTE
+	// namespace, and the compiler reports an ambiguous symbol inside the define.
+	if(RegOpenKeyExA((HKEY)0x80000001, "Software\\Griffin Software\\MetalScroll", 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
+		return;
+
+	ReadRegInt(&s_barWidth, key, "BarWidth");
+	ReadRegInt(&s_whitespaceColor, key, "WhitespaceColor");
+	ReadRegInt(&s_upperCaseColor, key, "UpperCaseColor");
+	ReadRegInt(&s_characterColor, key, "OtherCharColor");
+	ReadRegInt(&s_commentColor, key, "CommentColor");
+	ReadRegInt(&s_cursorOpacity, key, "CursorOpacity");
+	ReadRegInt(&s_matchColor, key, "MatchedWordColor");
+	ReadRegInt(&s_modifiedLineColor, key, "ModifiedLineColor");
+	ReadRegInt(&s_unsavedLineColor, key, "UnsavedLineColor");
+
+	unsigned int cursorColor;
+	if(ReadRegInt(&cursorColor, key, "CursorColor"))
+	{
+		s_cursorColor[2] = (cursorColor >> 16) & 0xff;
+		s_cursorColor[1] = (cursorColor >> 8) & 0xff;
+		s_cursorColor[0] = cursorColor & 0xff;
+	}
+
+	RegCloseKey(key);
+}
+
+void MetalBar::WriteRegInt(HKEY key, const char* name, unsigned int val)
+{
+	RegSetValueEx(key, name, 0, REG_DWORD, (LPBYTE)&val, sizeof(val));
+}
+
+void MetalBar::SaveSettings()
+{
+	HKEY key;
+	// See the comments in ReadSettings() about the magic constant.
+	if(RegCreateKeyExA((HKEY)0x80000001, "Software\\Griffin Software\\MetalScroll", 0, 0, 0, KEY_SET_VALUE, 0, &key, 0) != ERROR_SUCCESS)
+		return;
+
+	WriteRegInt(key, "BarWidth", s_barWidth);
+	WriteRegInt(key, "WhitespaceColor", s_whitespaceColor);
+	WriteRegInt(key, "UpperCaseColor", s_upperCaseColor);
+	WriteRegInt(key, "OtherCharColor", s_characterColor);
+	WriteRegInt(key, "CommentColor", s_commentColor);
+	WriteRegInt(key, "CursorOpacity", s_cursorOpacity);
+	WriteRegInt(key, "MatchedWordColor", s_matchColor);
+	WriteRegInt(key, "ModifiedLineColor", s_modifiedLineColor);
+	WriteRegInt(key, "UnsavedLineColor", s_unsavedLineColor);
+
+	unsigned int cursorColor = (s_cursorColor[2] << 16) | (s_cursorColor[1] << 8) | s_cursorColor[0];
+	WriteRegInt(key, "CursorColor", cursorColor);
+
+	RegCloseKey(key);
 }
