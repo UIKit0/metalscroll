@@ -225,6 +225,26 @@
 				>
 			</File>
 			<File
+				RelativePath=".\AddIn_i.c"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath=".\ColorChip.cpp"
 				>
 			</File>
@@ -260,6 +280,10 @@
 				RelativePath=".\OptionsDialog.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\TextEventHandler.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -290,6 +314,10 @@
 				RelativePath=".\Resource.h"
 				>
 			</File>
+			<File
+				RelativePath=".\TextEventHandler.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
@@ -306,6 +334,10 @@
 			</File>
 			<File
 				RelativePath=".\AddIn.rgs"
+				>
+			</File>
+			<File
+				RelativePath=".\TextEventHandler.rgs"
 				>
 			</File>
 		</Filter>

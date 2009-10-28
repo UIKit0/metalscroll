@@ -15,7 +15,9 @@
 */
 
 #pragma once
+
 #include "resource.h"
+#include "AddIn.h"
 
 using namespace AddInDesignerObjects;
 using namespace EnvDTE;
