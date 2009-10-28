@@ -19,6 +19,8 @@
 #include "OptionsDialog.h"
 #include "TextEventHandler.h"
 
+#define REFRESH_CODE_TIMER_ID		1
+
 extern CComPtr<IVsTextManager>		g_textMgr;
 
 unsigned int MetalBar::s_barWidth;
@@ -262,6 +264,18 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		{
 			OptionsDialog dlg;
 			dlg.Execute();
+			return 0;
+		}
+
+		case WM_TIMER:
+		{
+			if(wparam != REFRESH_CODE_TIMER_ID)
+				break;
+
+			// Remove the timer, invalidate the code image and repaint the control.
+			KillTimer(hwnd, REFRESH_CODE_TIMER_ID);
+			m_codeImgDirty = true;
+			InvalidateRect(hwnd, 0, 0);
 			return 0;
 		}
 	}
@@ -512,8 +526,10 @@ void MetalBar::OnPaint(HDC ctrlDC)
 
 void MetalBar::OnCodeChanged(const TextLineChange* /*textLineChange*/)
 {
-	m_codeImgDirty = true;
-	InvalidateRect(m_hwnd, 0, 0);
+	// If the user is typing, this thing will keep resetting the timer to one second.
+	// If the user stops typing for one second, the timer message arrives and the code
+	// image is drawn. This way we don't slow down the IDE while the user is editing code.
+	SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, 1000, 0);
 }
 
 void MetalBar::ResetSettings()
