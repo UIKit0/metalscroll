@@ -19,6 +19,8 @@
 #include "resource.h"
 #include "MetalBar.h"
 
+extern CComPtr<EnvDTE80::DTE2>		g_dte;
+
 void OptionsDialog::InitDialog(HWND hwnd)
 {
 	SetWindowLongPtr(hwnd, GWL_USERDATA, (::LONG_PTR)this);
@@ -94,10 +96,10 @@ INT_PTR CALLBACK OptionsDialog::DlgProc(HWND hwnd, UINT msg, WPARAM wparam, LPAR
 	return 1;
 }
 
-void OptionsDialog::Execute(EnvDTE::_DTE* dte)
+void OptionsDialog::Execute()
 {
 	CComPtr<EnvDTE::Window> mainWnd;
-	HRESULT hr = dte->get_MainWindow(&mainWnd);
+	HRESULT hr = g_dte->get_MainWindow(&mainWnd);
 	if(FAILED(hr) || !mainWnd)
 		return;
 

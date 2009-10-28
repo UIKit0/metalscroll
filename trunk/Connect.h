@@ -25,27 +25,21 @@ class ATL_NO_VTABLE CConnect :
 	public CComObjectRootEx<CComSingleThreadModel>,
 	public CComCoClass<CConnect, &CLSID_Connect>,
 	public IDispatchImpl<_IDTExtensibility2, &IID__IDTExtensibility2, &LIBID_AddInDesignerObjects, 1, 0>,
-	public IDispEventImpl<1, CConnect, &__uuidof(_dispWindowEvents), &LIBID_EnvDTE, 8, 0>,
-	public IDispEventImpl<1, CConnect, &__uuidof(_dispTextEditorEvents), &LIBID_EnvDTE, 8, 0>
+	public IDispatchImpl<IVsTextManagerEvents, &__uuidof(IVsTextManagerEvents), &LIBID_TextManagerInternal>,
+	public IDispatchImpl<IVsTextViewEvents, &__uuidof(IVsTextViewEvents), &LIBID_TextManagerInternal>
 {
 public:
-	CConnect()
-	{
-	}
+	CConnect();
 
-DECLARE_REGISTRY_RESOURCEID(IDR_ADDIN)
-DECLARE_NOT_AGGREGATABLE(CConnect)
+	DECLARE_REGISTRY_RESOURCEID(IDR_ADDIN)
+	DECLARE_NOT_AGGREGATABLE(CConnect)
 
-BEGIN_COM_MAP(CConnect)
-	COM_INTERFACE_ENTRY(IDispatch)
-	COM_INTERFACE_ENTRY(IDTExtensibility2)
-END_COM_MAP()
-
-BEGIN_SINK_MAP(CConnect)
-	SINK_ENTRY_EX(1, __uuidof(_dispWindowEvents), 3, OnWindowActivated)
-	SINK_ENTRY_EX(1, __uuidof(_dispWindowEvents), 4, OnWindowCreated)
-	SINK_ENTRY_EX(1, __uuidof(_dispTextEditorEvents), 1, OnLineChanged)
-END_SINK_MAP()
+	BEGIN_COM_MAP(CConnect)
+		COM_INTERFACE_ENTRY(IDispatch)
+		COM_INTERFACE_ENTRY(IDTExtensibility2)
+		COM_INTERFACE_ENTRY(IVsTextManagerEvents)
+		COM_INTERFACE_ENTRY(IVsTextViewEvents)
+	END_COM_MAP()
 
 	DECLARE_PROTECT_FINAL_CONSTRUCT()
 
@@ -53,30 +47,36 @@ END_SINK_MAP()
 	{
 		return S_OK;
 	}
-	
+
 	void FinalRelease() 
 	{
 	}
 
 	STDMETHOD(OnConnection)(IDispatch* application, ext_ConnectMode connectMode, IDispatch* addInInst, SAFEARRAY** custom);
 	STDMETHOD(OnDisconnection)(ext_DisconnectMode removeMode, SAFEARRAY** custom);
-	STDMETHOD(OnAddInsUpdate)(SAFEARRAY** custom);
-	STDMETHOD(OnStartupComplete)(SAFEARRAY** custom);
-	STDMETHOD(OnBeginShutdown)(SAFEARRAY** custom);
+	STDMETHOD(OnAddInsUpdate)(SAFEARRAY** /*custom*/) { return S_OK; }
+	STDMETHOD(OnStartupComplete)(SAFEARRAY** /*custom*/) { return S_OK; }
+	STDMETHOD(OnBeginShutdown)(SAFEARRAY** /*custom*/) { return S_OK; }
 
-	void __stdcall				OnWindowActivated(Window* gotFocus, Window* lostFocus);
-	void __stdcall				OnWindowCreated(Window* window);
-	void __stdcall				OnLineChanged(TextPoint* startPoint, TextPoint* endPoint, long hint);
+	// IVsTextManagerEvents implementation.
+	void STDMETHODCALLTYPE		OnRegisterMarkerType(long /*markerType*/) {}
+	void STDMETHODCALLTYPE		OnRegisterView(IVsTextView* view);
+	void STDMETHODCALLTYPE		OnUnregisterView(IVsTextView* /*view*/) {}
+	void STDMETHODCALLTYPE		OnUserPreferencesChanged(const VIEWPREFERENCES* /*viewPrefs*/, const FRAMEPREFERENCES* /*framePrefs*/, const LANGPREFERENCES* /*langPrefs*/, const FONTCOLORPREFERENCES* /*colorPrefs*/) {}
+
+	// IVsTextViewEvents implementation.
+	void STDMETHODCALLTYPE		OnSetFocus(IVsTextView* view);
+	void STDMETHODCALLTYPE		OnKillFocus(IVsTextView* /*view*/) {}
+	void STDMETHODCALLTYPE		OnSetBuffer(IVsTextView* /*view*/, IVsTextLines* /*buffer*/) {}
+	void STDMETHODCALLTYPE		OnChangeScrollInfo(IVsTextView* /*view*/, long /*bar*/, long /*minUnit*/, long /*maxUnits*/, long /*visibleUnits*/, long /*firstVisibleUnit*/) {}
+	void STDMETHODCALLTYPE		OnChangeCaretLine(IVsTextView* /*view*/, long /*newLine*/, long /*oldLine*/) {}
 
 private:
-	CComPtr<DTE2>				m_dte;
-	CComPtr<AddIn>				m_addInInstance;
+	DWORD						m_textMgrEventsCookie;
 
-	CComPtr<_WindowEvents>		m_wndEvents;
-	CComPtr<_TextEditorEvents>	m_textEditorEvents;
-
-	void						CreateOrUpdateScrollBars(Window* window, TextDocument* textDoc, TextPoint* changeStartPoint, TextPoint* changeEndPoint);
-	void						CheckWindow(Window* window);
+	bool						GetTextManagerEventsPlug(IConnectionPoint** connPt);
+	bool						GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* view);
+	void						HookScrollbar(IVsTextView* view);
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(Connect), CConnect)

@@ -21,7 +21,7 @@
 class OptionsDialog
 {
 public:
-	void						Execute(EnvDTE::_DTE* dte);
+	void						Execute();
 
 private:
 	enum DlgRetCode
