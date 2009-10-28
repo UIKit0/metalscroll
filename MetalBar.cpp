@@ -18,6 +18,8 @@
 #include "MetalBar.h"
 #include "OptionsDialog.h"
 
+extern CComPtr<IVsTextManager>		g_textMgr;
+
 unsigned int MetalBar::s_barWidth;
 unsigned int MetalBar::s_whitespaceColor;
 unsigned int MetalBar::s_upperCaseColor;
@@ -29,15 +31,15 @@ unsigned int MetalBar::s_modifiedLineColor;
 unsigned int MetalBar::s_unsavedLineColor;
 std::set<MetalBar*> MetalBar::s_bars;
 
-MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, TextDocument* doc)
+MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IVsTextView* view)
 {
 	m_oldProc = oldProc;
 	m_hwnd = vertBar;
 	m_editorWnd = editor;
 	m_horizBar = horizBar;
 
-	m_doc = doc;
-	m_doc->AddRef();
+	m_view = view;
+	m_view->AddRef();
 	m_numLines = 0;
 
 	m_codeImgDirty = true;
@@ -56,13 +58,15 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, Te
 	m_dragging = false;
 
 	s_bars.insert(this);
+
+	AdjustSize(s_barWidth);
 }
 
 MetalBar::~MetalBar()
 {
 	// Free the document.
-	if(m_doc)
-		m_doc->Release();
+	if(m_view)
+		m_view->Release();
 
 	// Free the paint stuff.
 	if(m_codeImg)
@@ -248,13 +252,8 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 		case WM_LBUTTONDBLCLK:
 		{
-			CComPtr<_DTE> dte;
-			HRESULT hr = m_doc->get_DTE(&dte);
-			if(SUCCEEDED(hr) && dte)
-			{
-				OptionsDialog dlg;
-				dlg.Execute(dte);
-			}
+			OptionsDialog dlg;
+			dlg.Execute();
 			return 0;
 		}
 	}
@@ -264,28 +263,30 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 void MetalBar::RenderCodeImg()
 {
-	long tabSize;
-	HRESULT hr = m_doc->get_TabSize(&tabSize);
+	CComPtr<IVsTextLines> lines;
+	HRESULT hr = m_view->GetBuffer(&lines);
+	if(FAILED(hr) || !lines)
+		return;
+
+	unsigned int tabSize;
+	LANGPREFERENCES langPrefs;
+	if( SUCCEEDED(lines->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
+		tabSize = langPrefs.uTabSize;
+	else
+		tabSize = 4;
+
+	hr = lines->GetLineCount(&m_numLines);
 	if(FAILED(hr))
 		return;
 
-	CComPtr<EditPoint> startEp;
-	hr = m_doc->CreateEditPoint(0, &startEp);
-	if(FAILED(hr) || !startEp)
-		return;
-
-	CComPtr<TextPoint> endTp;
-	hr = m_doc->get_EndPoint(&endTp);
-	if(FAILED(hr) || !endTp)
+	long numCharsLastLine;
+	hr = lines->GetLengthOfLine(m_numLines - 1, &numCharsLastLine);
+	if(FAILED(hr))
 		return;
 
 	CComBSTR text;
-	hr = startEp->GetText(CComVariant(endTp), &text);
+	hr = lines->GetLineText(0, 0, m_numLines - 1, numCharsLastLine, &text);
 	if(FAILED(hr) || !text)
-		return;
-
-	hr = endTp->get_Line(&m_numLines);
-	if(FAILED(hr))
 		return;
 
 	if(m_numLines < 1)
@@ -393,6 +394,10 @@ void MetalBar::RenderCodeImg()
 		}
 	}
 
+	// Fill the remaining pixels of the first line.
+	for(; linePos < s_barWidth; ++linePos)
+		pixel[linePos] = s_whitespaceColor;
+
 	if(!m_imgDC)
 		m_imgDC = CreateCompatibleDC(0);
 	SelectObject(m_imgDC, m_codeImg);
@@ -449,7 +454,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		RECT remainingRect;
 		remainingRect.left = clRect.left;
 		remainingRect.right = clRect.right;
-		remainingRect.top = clRect.top + m_numLines - 1;
+		remainingRect.top = clRect.top + m_numLines;
 		remainingRect.bottom = clRect.bottom;
 		// Wondrous hack (c) MFC: fill a rect with ExtTextOut(), since it doesn't require us to create a brush.
 		ExtTextOut(m_backBufferDC, 0, 0, ETO_OPAQUE, &remainingRect, NULL, 0, NULL);

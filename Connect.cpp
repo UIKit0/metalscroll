@@ -22,35 +22,61 @@
 
 extern CAddInModule _AtlModule;
 
+CComPtr<DTE2>				g_dte;
+CComPtr<AddIn>				g_addInInstance;
+CComPtr<IVsTextManager>		g_textMgr;
+
+CConnect::CConnect()
+{
+	m_textMgrEventsCookie = 0;
+}
+
+bool CConnect::GetTextManagerEventsPlug(IConnectionPoint** connPt)
+{
+	CComQIPtr<IConnectionPointContainer> connPoints = g_textMgr;
+	if(!connPoints)
+		return false;
+
+	HRESULT hr = connPoints->FindConnectionPoint(__uuidof(IVsTextManagerEvents), connPt);
+	return SUCCEEDED(hr) && *connPt;
+}
+
+bool CConnect::GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* view)
+{
+	CComQIPtr<IConnectionPointContainer> connPoints = view;
+	if(!connPoints)
+		return false;
+
+	HRESULT hr = connPoints->FindConnectionPoint(__uuidof(IVsTextViewEvents), connPt);
+	return SUCCEEDED(hr) && *connPt;
+}
+
 STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*connectMode*/, IDispatch* addInInst, SAFEARRAY** /*custom*/)
 {
-	HRESULT hr = application->QueryInterface(__uuidof(DTE2), (void**)&m_dte);
+	HRESULT hr = application->QueryInterface(__uuidof(DTE2), (void**)&g_dte);
 	if(FAILED(hr))
 		return hr;
 
-	hr = addInInst->QueryInterface(__uuidof(AddIn), (void**)&m_addInInstance);
+	hr = addInInst->QueryInterface(__uuidof(AddIn), (void**)&g_addInInstance);
 	if(FAILED(hr))
 		return hr;
 
-	CComPtr<Events> events;
-	hr = m_dte->get_Events(&events);
-	if(FAILED(hr) || !events)
-		return hr;
+	CComQIPtr<IServiceProvider> sp = g_dte;
+	if(!sp)
+		return E_NOINTERFACE;
 
-	hr = events->get_WindowEvents(0, (_WindowEvents**)&m_wndEvents);
-	if(FAILED(hr) || !m_wndEvents)
-		return hr;
-	hr = IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispWindowEvents)>::DispEventAdvise(m_wndEvents);
+	hr = sp->QueryService(SID_SVsTextManager, IID_IVsTextManager, (void**)&g_textMgr);
+	if(FAILED(hr) || !g_textMgr)
+		return E_NOINTERFACE;
+
+	CComPtr<IConnectionPoint> connPt;
+	if(!GetTextManagerEventsPlug(&connPt))
+		return E_NOINTERFACE;
+
+	hr = connPt->Advise((IVsTextManagerEvents*)this, &m_textMgrEventsCookie);
 	if(FAILED(hr))
 		return hr;
 
-	hr = events->get_TextEditorEvents(0, (_TextEditorEvents**)&m_textEditorEvents);
-	if(FAILED(hr) || !m_textEditorEvents)
-		return hr;
-	hr = IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispTextEditorEvents)>::DispEventAdvise(m_textEditorEvents);
-	if(FAILED(hr))
-		return hr;
-	
 	MetalBar::ReadSettings();
 	ColorChip::Register();
 
@@ -59,90 +85,56 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 
 STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEARRAY** /*custom*/)
 {
-	if(m_wndEvents)
+	CComPtr<IConnectionPoint> textMgrEventsPlug;
+	if(m_textMgrEventsCookie && GetTextManagerEventsPlug(&textMgrEventsPlug))
 	{
-		IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispWindowEvents)>::DispEventUnadvise(m_wndEvents);
-		m_wndEvents = 0;
-	}
-
-	if(m_textEditorEvents)
-	{
-		IDispEventSimpleImpl<1, CConnect, &__uuidof(_dispTextEditorEvents)>::DispEventUnadvise(m_textEditorEvents);
-		m_textEditorEvents = 0;
+		textMgrEventsPlug->Unadvise(m_textMgrEventsCookie);
+		m_textMgrEventsCookie = 0;
 	}
 
 	MetalBar::RemoveAllBars();
-
-	m_dte = 0;
-	m_addInInstance = 0;
-
 	ColorChip::Unregister();
 
+	// Give up the global pointers.
+	g_textMgr = 0;
+	g_addInInstance = 0;
+	g_dte = 0;
 	return S_OK;
 }
 
-STDMETHODIMP CConnect::OnAddInsUpdate(SAFEARRAY** /*custom*/)
+void STDMETHODCALLTYPE CConnect::OnRegisterView(IVsTextView* view)
 {
-	return S_OK;
+	// Unfortunately, the window hasn't been created at this point yet, so we can't get the HWND
+	// here. Register an even handler to catch SetFocus(), and get the HWND from there. We'll remove
+	// the handler after the first SetFocus() as we don't care about getting more events once we
+	// have the HWND.
+	CComPtr<IConnectionPoint> connPt;
+	if(!GetTextViewEventsPlug(&connPt, view))
+		return;
+	DWORD cookie;
+	connPt->Advise((IVsTextViewEvents*)this, &cookie);
 }
 
-STDMETHODIMP CConnect::OnStartupComplete(SAFEARRAY** /*custom*/)
+struct ScrollbarHandles
 {
-	return S_OK;
-}
-
-STDMETHODIMP CConnect::OnBeginShutdown(SAFEARRAY** /*custom*/)
-{
-	return S_OK;
-}
-
-void CConnect::OnWindowActivated(Window* gotFocus, Window* /*lostFocus*/)
-{
-	CheckWindow(gotFocus);
-}
-
-void CConnect::OnWindowCreated(Window* window)
-{
-	CheckWindow(window);
-}
-
-static BOOL CALLBACK FindSplitterRoot(HWND hwnd, LPARAM param)
-{
-	wchar_t className[64];
-	GetClassNameW(hwnd, className, _countof(className));
-	if(_wcsicmp(className, L"VsSplitterRoot") == 0)
-	{
-		*(HWND*)param = hwnd;
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
-struct EditorHandles
-{
-	HWND	editor;
-	HWND	vertScroll;
-	HWND	horizScroll;
+	HWND		vert;
+	HWND		horiz;
 };
 
-static BOOL CALLBACK FindEditorAndScrollBar(HWND hwnd, LPARAM param)
+static BOOL CALLBACK FindScrollbars(HWND hwnd, LPARAM param)
 {
-	EditorHandles* handles = (EditorHandles*)param;
+	ScrollbarHandles* handles = (ScrollbarHandles*)param;
 
-	wchar_t className[64];
-	GetClassNameW(hwnd, className, _countof(className));
-
-	if(_wcsicmp(className, L"ScrollBar") == 0)
+	char className[64];
+	GetClassNameA(hwnd, className, _countof(className));
+	if(strcmp(className, "ScrollBar") == 0)
 	{
 		LONG styles = GetWindowLong(hwnd, GWL_STYLE);
 		if(styles & SBS_VERT)
-			handles->vertScroll = hwnd;
+			handles->vert = hwnd;
 		else
-			handles->horizScroll = hwnd;
+			handles->horiz = hwnd;
 	}
-	else if(_wcsicmp(className, L"VsTextEditPane") == 0)
-		handles->editor = hwnd;
 
 	return TRUE;
 }
@@ -156,127 +148,51 @@ static LRESULT FAR PASCAL ScrollBarProc(HWND hwnd, UINT message, WPARAM wparam, 
 	return bar->WndProc(hwnd, message, wparam, lparam);
 }
 
-struct ScrollBarUpdateData
+void CConnect::HookScrollbar(IVsTextView* view)
 {
-	TextDocument*	textDoc;
-	TextPoint*		changeStartPoint;
-	TextPoint*		changeEndPoint;
-};
+	HWND editorHwnd = view->GetWindowHandle();
+	if(!editorHwnd)
+		return;
 
-static BOOL CALLBACK CheckEditorPanels(HWND hwnd, LPARAM param)
+	ScrollbarHandles bars = { 0 };
+	EnumChildWindows(GetParent(editorHwnd), FindScrollbars, (LPARAM)&bars);
+	if(!bars.horiz || !bars.vert)
+		return;
+
+	if(GetWindowLongPtr(bars.vert, GWL_USERDATA) != 0)
+		return;
+
+	WNDPROC oldProc = (WNDPROC)SetWindowLongPtr(bars.vert, GWLP_WNDPROC, (::LONG_PTR)ScrollBarProc);
+	MetalBar* bar = new MetalBar(bars.vert, editorHwnd, bars.horiz, oldProc, view);
+	SetWindowLongPtr(bars.vert, GWL_USERDATA, (::LONG_PTR)bar);
+}
+
+void STDMETHODCALLTYPE CConnect::OnSetFocus(IVsTextView* view)
 {
-	wchar_t className[64];
-	GetClassNameW(hwnd, className, _countof(className));
-	if(_wcsicmp(className, L"VsEditPane") != 0)
-		return TRUE;
+	HookScrollbar(view);
 
-	// Find the vertical scrollbar.
-	EditorHandles handles = { 0 };
-	EnumChildWindows(hwnd, FindEditorAndScrollBar, (LPARAM)&handles);
-	if(!handles.editor || !handles.vertScroll || !handles.horizScroll)
-		return TRUE;
+	// Remove ourselves from the event list. Since we can't store the cookie we got
+	// when we registered the event handler, we'll have to scan the event list looking
+	// for our pointer.
+	CComPtr<IConnectionPoint> connPt;
+	if(!GetTextViewEventsPlug(&connPt, view))
+		return;
 
-	ScrollBarUpdateData* updData = (ScrollBarUpdateData*)param;
+	CComPtr<IEnumConnections> enumerator;
+	HRESULT hr = connPt->EnumConnections(&enumerator);
+	if(FAILED(hr) || !enumerator)
+		return;
 
-	// Check if it's already subclassed.
-	::LONG_PTR wndData = GetWindowLongPtr(handles.vertScroll, GWL_USERDATA);
-	MetalBar* bar;
-	if(!wndData)
+	CONNECTDATA connData;
+	ULONG numRet;
+	bool found = false;
+	while( SUCCEEDED(enumerator->Next(1, &connData, &numRet)) && (numRet > 0) )
 	{
-		// Install our own window procedure.
-		WNDPROC oldProc = (WNDPROC)SetWindowLongPtr(handles.vertScroll, GWLP_WNDPROC, (::LONG_PTR)ScrollBarProc);
-		bar = new MetalBar(handles.vertScroll, handles.editor, handles.horizScroll, oldProc, updData->textDoc);
-		SetWindowLongPtr(handles.vertScroll, GWL_USERDATA, (::LONG_PTR)bar);
+		if(connData.pUnk == (IVsTextViewEvents*)this)
+		{
+			connPt->Unadvise(connData.dwCookie);
+			found = true;
+		}
+		connData.pUnk->Release();
 	}
-	else
-		bar = (MetalBar*)wndData;
-
-	if(updData->changeStartPoint && updData->changeEndPoint)
-		bar->OnCodeChanged(updData->changeStartPoint, updData->changeEndPoint);
-
-	// Continue walking the child list.
-	return TRUE;
-}
-
-void CConnect::CreateOrUpdateScrollBars(Window* window, TextDocument* textDoc, TextPoint* changeStartPoint, TextPoint* changeEndPoint)
-{
-	// The little shit won't give up its HWND the nice way (via get_HWnd()). Alt+8 to the rescue!
-	// Luckily, get_HWnd() is a tiny function. Right at the start, it checks if an int at offset
-	// 0x4c in the object is 0. If it's 0, it returns the handle, which is at offset 0x48 in the object.
-	// For the code window, the int at 0x4c is 16, so it returns 0. However, the handle at 0x48 is still
-	// valid even for the code window, so we'll just fetch it with a bit of pointer math.
-	HWND paneHwnd = *(HWND*)((unsigned char*)window + 0x48);
-	if(!paneHwnd)
-		return;
-
-	// The handle we've got is for the entire panel. The scrollbar will be a number of levels down in the
-	// hierarchy, but first make sure the window is what we expect it to be.
-	wchar_t className[64];
-	GetClassNameW(paneHwnd, className, _countof(className));
-	if(_wcsicmp(className, L"GenericPane") != 0)
-		return;
-
-	// The pane normally has a single child, but Visual Assist inserts its go button and the context and
-	// definition dropdowns inside the pane when it's active. Therefore, we need to search for a window
-	// with class "VsSplitterRoot" instead of just getting the first child.
-	HWND splitterHwnd = 0;
-	EnumChildWindows(paneHwnd, FindSplitterRoot, (LPARAM)&splitterHwnd);
-	if(!splitterHwnd)
-		return;
-
-	// Now check all the children with class "VsEditPane".
-	ScrollBarUpdateData updData;
-	updData.textDoc = textDoc;
-	updData.changeStartPoint = changeStartPoint;
-	updData.changeEndPoint = changeEndPoint;
-	EnumChildWindows(splitterHwnd, CheckEditorPanels, (LPARAM)&updData);
-}
-
-void CConnect::CheckWindow(Window* window)
-{
-	// See if it's a code window.
-	CComBSTR kind;
-	HRESULT hr = window->get_ObjectKind(&kind);
-	if(FAILED(hr))
-		return;
-
-	if(kind != vsDocumentKindText)
-		return;
-
-	// The the TextDocument object from it.
-	CComPtr<Document> doc;
-	hr = window->get_Document(&doc);
-	if(FAILED(hr) || !doc)
-		return;
-
-	CComPtr<IDispatch> disp;
-	hr = doc->Object(L"TextDocument", &disp);
-	if(FAILED(hr) || !disp)
-		return;
-
-	CComQIPtr<TextDocument> textDoc = disp;
-	if(!textDoc)
-		return;
-
-	CreateOrUpdateScrollBars(window, textDoc, 0, 0);
-}
-
-void CConnect::OnLineChanged(TextPoint* startPoint, TextPoint* endPoint, long /*hint*/)
-{
-	CComPtr<TextDocument> textDoc;
-	HRESULT hr = startPoint->get_Parent(&textDoc);
-	if(FAILED(hr) || !textDoc)
-		return;
-
-	CComPtr<Document> doc;
-	hr = textDoc->get_Parent(&doc);
-	if(FAILED(hr) || !doc)
-		return;
-
-	CComPtr<Window> wnd;
-	hr = doc->get_ActiveWindow(&wnd);
-	if(FAILED(hr) || !wnd)
-		return;
-
-	CreateOrUpdateScrollBars(wnd, textDoc, startPoint, endPoint);
 }
