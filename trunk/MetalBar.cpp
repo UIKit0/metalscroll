@@ -23,11 +23,11 @@ unsigned int MetalBar::s_whitespaceColor;
 unsigned int MetalBar::s_upperCaseColor;
 unsigned int MetalBar::s_characterColor;
 unsigned int MetalBar::s_commentColor;
-unsigned char MetalBar::s_cursorColor[3];
-unsigned int MetalBar::s_cursorOpacity;
+unsigned int MetalBar::s_cursorColor;
 unsigned int MetalBar::s_matchColor;
 unsigned int MetalBar::s_modifiedLineColor;
 unsigned int MetalBar::s_unsavedLineColor;
+std::set<MetalBar*> MetalBar::s_bars;
 
 MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, TextDocument* doc)
 {
@@ -46,6 +46,7 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, Te
 	m_backBufferImg = 0;
 	m_backBufferDC = 0;
 	m_backBufferBits = 0;
+	m_backBufferWidth = 0;
 	m_backBufferHeight = 0;
 
 	m_pageSize = 1;
@@ -53,14 +54,12 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, Te
 	m_scrollMin = 0;
 	m_scrollMax = 1;
 	m_dragging = false;
+
+	s_bars.insert(this);
 }
 
 MetalBar::~MetalBar()
 {
-	// Restore the original window procedure.
-	SetWindowLongPtr(m_hwnd, GWL_USERDATA, 0);
-	SetWindowLongPtr(m_hwnd, GWL_WNDPROC, (::LONG_PTR)m_oldProc);
-
 	// Free the document.
 	if(m_doc)
 		m_doc->Release();
@@ -74,14 +73,34 @@ MetalBar::~MetalBar()
 		DeleteObject(m_backBufferDC);
 }
 
-void MetalBar::AdjustSize()
+void MetalBar::RemoveWndProcHook()
+{
+	SetWindowLongPtr(m_hwnd, GWL_USERDATA, 0);
+	SetWindowLongPtr(m_hwnd, GWL_WNDPROC, (::LONG_PTR)m_oldProc);
+}
+
+void MetalBar::RemoveAllBars()
+{
+	int regularBarWidth = GetSystemMetrics(SM_CXVSCROLL);
+	for(std::set<MetalBar*>::iterator it = s_bars.begin(); it != s_bars.end(); ++it)
+	{
+		MetalBar* bar = *it;
+		// We must remove the window proc hook before calling AdjustSize(), otherwise WM_SIZE comes and changes the width again.
+		bar->RemoveWndProcHook();
+		bar->AdjustSize(regularBarWidth);
+		delete bar;
+	}
+	s_bars.clear();
+}
+
+void MetalBar::AdjustSize(unsigned int requiredWidth)
 {
 	// See if we have the expected width.
 	WINDOWPLACEMENT vertBarPlacement;
 	vertBarPlacement.length = sizeof(vertBarPlacement);
 	GetWindowPlacement(m_hwnd, &vertBarPlacement);
 	int width = vertBarPlacement.rcNormalPosition.right - vertBarPlacement.rcNormalPosition.left;
-	int diff = s_barWidth - width;
+	int diff = requiredWidth - width;
 	if(diff == 0)
 		return;
 
@@ -140,8 +159,14 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 	switch(message)
 	{
-		case WM_DESTROY:
+		case WM_NCDESTROY:
 		{
+			RemoveWndProcHook();
+			// Remove it from the list of scrollbars.
+			std::set<MetalBar*>::iterator it = s_bars.find(this);
+			if(it != s_bars.end())
+				s_bars.erase(it);
+			// Finally delete the object.
 			delete this;
 			break;
 		}
@@ -160,7 +185,7 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 		case WM_WINDOWPOSCHANGED:
 		case WM_SIZE:
-			AdjustSize();
+			AdjustSize(s_barWidth);
 			break;
 
 		case WM_ERASEBKGND:
@@ -394,7 +419,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	if(!m_backBufferDC)
 		m_backBufferDC = CreateCompatibleDC(ctrlDC);
 
-	if(!m_backBufferImg || (m_backBufferHeight != barHeight))
+	if(!m_backBufferImg || (m_backBufferWidth != s_barWidth) || (m_backBufferHeight != (unsigned int)barHeight))
 	{
 		if(m_backBufferImg)
 			DeleteObject(m_backBufferImg);
@@ -409,6 +434,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		bi.bmiHeader.biCompression = BI_RGB;
 		m_backBufferImg = CreateDIBSection(0, &bi, DIB_RGB_COLORS, (void**)&m_backBufferBits, 0, 0);
 		SelectObject(m_backBufferDC, m_backBufferImg);
+		m_backBufferWidth = s_barWidth;
 		m_backBufferHeight = barHeight;
 	}
 
@@ -448,13 +474,21 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		normalizedCursor = barHeight - normalizedPage;
 
 	// Overlay the current page marker. Since the bitmap is upside down, we must flip the cursor.
+	unsigned char opacity = (unsigned char)(s_cursorColor >> 24);
+	unsigned char cursorColor[3] =
+	{
+		s_cursorColor & 0xff,
+		(s_cursorColor >> 8) & 0xff,
+		(s_cursorColor >> 16) & 0xff
+	};
+
 	unsigned char* end = (unsigned char*)(m_backBufferBits + (barHeight - normalizedCursor) * s_barWidth);
 	unsigned char* pixel = end - normalizedPage * s_barWidth * 4;
 	for(; pixel < end; pixel += 4)
 	{
 		for(int i = 0; i < 3; ++i)
 		{
-			int p = (s_cursorOpacity*pixel[i])/255 + s_cursorColor[i];
+			int p = (opacity*pixel[i])/255 + cursorColor[i];
 			pixel[i] = (p <= 255) ? (unsigned char)p : 255;
 		}
 	}
@@ -476,10 +510,7 @@ void MetalBar::ResetSettings()
 	s_upperCaseColor = 0xff101010;
 	s_characterColor = 0xff808080;
 	s_commentColor = 0xff008000;
-	s_cursorColor[0] = 0x28;
-	s_cursorColor[1] = 0x00;
-	s_cursorColor[2] = 0x00;
-	s_cursorOpacity = 224;
+	s_cursorColor = 0xe0000028;
 	s_matchColor = 0xffd7f600;
 	s_modifiedLineColor = 0xff0000ff;
 	s_unsavedLineColor = 0xffe1621e;
@@ -516,18 +547,10 @@ void MetalBar::ReadSettings()
 	ReadRegInt(&s_upperCaseColor, key, "UpperCaseColor");
 	ReadRegInt(&s_characterColor, key, "OtherCharColor");
 	ReadRegInt(&s_commentColor, key, "CommentColor");
-	ReadRegInt(&s_cursorOpacity, key, "CursorOpacity");
+	ReadRegInt(&s_cursorColor, key, "CursorColor");
 	ReadRegInt(&s_matchColor, key, "MatchedWordColor");
 	ReadRegInt(&s_modifiedLineColor, key, "ModifiedLineColor");
 	ReadRegInt(&s_unsavedLineColor, key, "UnsavedLineColor");
-
-	unsigned int cursorColor;
-	if(ReadRegInt(&cursorColor, key, "CursorColor"))
-	{
-		s_cursorColor[2] = (cursorColor >> 16) & 0xff;
-		s_cursorColor[1] = (cursorColor >> 8) & 0xff;
-		s_cursorColor[0] = cursorColor & 0xff;
-	}
 
 	RegCloseKey(key);
 }
@@ -549,13 +572,19 @@ void MetalBar::SaveSettings()
 	WriteRegInt(key, "UpperCaseColor", s_upperCaseColor);
 	WriteRegInt(key, "OtherCharColor", s_characterColor);
 	WriteRegInt(key, "CommentColor", s_commentColor);
-	WriteRegInt(key, "CursorOpacity", s_cursorOpacity);
+	WriteRegInt(key, "CursorColor", s_cursorColor);
 	WriteRegInt(key, "MatchedWordColor", s_matchColor);
 	WriteRegInt(key, "ModifiedLineColor", s_modifiedLineColor);
 	WriteRegInt(key, "UnsavedLineColor", s_unsavedLineColor);
 
-	unsigned int cursorColor = (s_cursorColor[2] << 16) | (s_cursorColor[1] << 8) | s_cursorColor[0];
-	WriteRegInt(key, "CursorColor", cursorColor);
-
 	RegCloseKey(key);
+
+	// Refresh all the scrollbars.
+	for(std::set<MetalBar*>::iterator it = s_bars.begin(); it != s_bars.end(); ++it)
+	{
+		MetalBar* bar = *it;
+		bar->m_codeImgDirty = true;
+		bar->AdjustSize(s_barWidth);
+		InvalidateRect(bar->m_hwnd, 0, 0);
+	}
 }

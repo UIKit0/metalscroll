@@ -33,7 +33,8 @@
 
 #include <atlbase.h>
 #include <atlcom.h>
-#include <commctrl.h> 
+#include <commctrl.h>
+#include <set>
 
 #pragma warning( disable : 4278 )
 #pragma warning( disable : 4146 )

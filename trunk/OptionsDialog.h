@@ -41,7 +41,7 @@ private:
 	ColorChip					m_modifLineSaved;
 	ColorChip					m_modifLineUnsaved;
 	ColorChip					m_cursorColor;
-	unsigned int				m_cursorOpacity;
+	unsigned int				m_cursorTrans;
 	unsigned int				m_barWidth;
 
 	void						InitDialog(HWND hwnd);

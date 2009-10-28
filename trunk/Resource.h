@@ -14,7 +14,7 @@
 #define IDC_MODIF_LINE_UNSAVED          207
 #define IDC_CURSOR_COLOR                208
 #define IDC_BAR_WIDTH                   209
-#define IDC_CURSOR_OPACITY              210
+#define IDC_CURSOR_TRANS                210
 #define IDC_RESET                       212
 
 // Next default values for new objects
