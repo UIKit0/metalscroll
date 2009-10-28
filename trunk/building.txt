@@ -1,0 +1,4 @@
+Notes on building MetalScroll:
+ * you must set %VSSDK_ROOT% to the directory where the Visual Studio SDK is installed, e.g. C:\Program Files (x86)\Microsoft Visual Studio 2008 SDK\VisualStudioIntegration.
+ * the registry file (addin.rgs) is set up so that the add-in auto-loads in 2005, but doesn't in 2008. This is done in order to allow us to develop in 2008 and debug in 2005. When you make a release, you must temporarily enable auto-loading for 2008 too by editing the RGS file. If the add-in was configured to auto-load in 2008 too, we wouldn't be able to build it, since the DLL would be in use by the IDE.
+ 
