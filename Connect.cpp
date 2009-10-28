@@ -71,7 +71,7 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 		m_textEditorEvents = 0;
 	}
 
-	// FIXME: delete all the bars so the window procedures get unhooked.
+	MetalBar::RemoveAllBars();
 
 	m_dte = 0;
 	m_addInInstance = 0;

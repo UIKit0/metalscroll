@@ -30,12 +30,10 @@ void OptionsDialog::InitDialog(HWND hwnd)
 	m_matchingWord.Init(GetDlgItem(hwnd, IDC_MATCHING_WORD), MetalBar::s_matchColor);
 	m_modifLineSaved.Init(GetDlgItem(hwnd, IDC_MODIF_LINE_SAVED), MetalBar::s_modifiedLineColor);
 	m_modifLineUnsaved.Init(GetDlgItem(hwnd, IDC_MODIF_LINE_UNSAVED), MetalBar::s_unsavedLineColor);
+	m_cursorColor.Init(GetDlgItem(hwnd, IDC_CURSOR_COLOR), MetalBar::s_cursorColor);
 
-	unsigned int cursorColor = (MetalBar::s_cursorColor[2] << 16) | (MetalBar::s_cursorColor[1] << 8) | MetalBar::s_cursorColor[0];
-	m_cursorColor.Init(GetDlgItem(hwnd, IDC_CURSOR_COLOR), cursorColor);
-
-	m_cursorOpacity = MetalBar::s_cursorOpacity;
-	SetDlgItemInt(hwnd, IDC_CURSOR_OPACITY, m_cursorOpacity, FALSE);
+	m_cursorTrans = MetalBar::s_cursorColor >> 24;
+	SetDlgItemInt(hwnd, IDC_CURSOR_TRANS, m_cursorTrans, FALSE);
 
 	m_barWidth = MetalBar::s_barWidth;
 	SetDlgItemInt(hwnd, IDC_BAR_WIDTH, m_barWidth, FALSE);
@@ -65,9 +63,9 @@ INT_PTR CALLBACK OptionsDialog::DlgProc(HWND hwnd, UINT msg, WPARAM wparam, LPAR
 					OptionsDialog* dlg = (OptionsDialog*)GetWindowLongPtr(hwnd, GWL_USERDATA);
 
 					// Read the integers.
-					dlg->m_cursorOpacity = GetDlgItemInt(hwnd, IDC_CURSOR_OPACITY, &intOk, FALSE);
+					dlg->m_cursorTrans = GetDlgItemInt(hwnd, IDC_CURSOR_TRANS, &intOk, FALSE);
 					if(!intOk)
-						dlg->m_cursorOpacity = MetalBar::s_cursorOpacity;
+						dlg->m_cursorTrans = MetalBar::s_cursorColor >> 24;
 					dlg->m_barWidth = GetDlgItemInt(hwnd, IDC_BAR_WIDTH, &intOk, FALSE);
 					if(!intOk)
 						dlg->m_barWidth = MetalBar::s_barWidth;
@@ -126,16 +124,9 @@ void OptionsDialog::Execute(EnvDTE::_DTE* dte)
 	MetalBar::s_matchColor = m_matchingWord.GetColor();
 	MetalBar::s_modifiedLineColor = m_modifLineSaved.GetColor();
 	MetalBar::s_unsavedLineColor = m_modifLineUnsaved.GetColor();
-
-	unsigned int cursorColor = m_cursorColor.GetColor();
-	MetalBar::s_cursorColor[2] = (cursorColor >> 16) & 0xff;
-	MetalBar::s_cursorColor[1] = (cursorColor >> 8) & 0xff;
-	MetalBar::s_cursorColor[0] = cursorColor & 0xff;
+	MetalBar::s_cursorColor = (m_cursorColor.GetColor() & 0xffffff) | ((m_cursorTrans & 0xff) << 24);
 
 	MetalBar::s_barWidth = m_barWidth;
-	MetalBar::s_cursorOpacity = m_cursorOpacity;
 
 	MetalBar::SaveSettings();
-
-	// It would be nice to invalidate all the scrollbars so that the changes take effect immediately, but I'm too lazy to do that.
 }

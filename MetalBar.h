@@ -31,19 +31,21 @@ public:
 	static void				ReadSettings();
 	static void				SaveSettings();
 
+	static void				RemoveAllBars();
+
 	// User-controllable parameters.
 	static unsigned int		s_barWidth;
 	static unsigned int		s_whitespaceColor;
 	static unsigned int		s_upperCaseColor;
 	static unsigned int		s_characterColor;
 	static unsigned int		s_commentColor;
-	static unsigned char	s_cursorColor[3];
-	static unsigned int		s_cursorOpacity;
+	static unsigned int		s_cursorColor;
 	static unsigned int		s_matchColor;
 	static unsigned int		s_modifiedLineColor;
 	static unsigned int		s_unsavedLineColor;
 
 private:
+	static std::set<MetalBar*>	s_bars;
 	static bool				ReadRegInt(unsigned int* to, HKEY key, const char* name);
 	static void				WriteRegInt(HKEY key, const char* name, unsigned int val);
 
@@ -64,7 +66,8 @@ private:
 	HBITMAP					m_backBufferImg;
 	HDC						m_backBufferDC;
 	unsigned int*			m_backBufferBits;
-	int						m_backBufferHeight;
+	unsigned int			m_backBufferWidth;
+	unsigned int			m_backBufferHeight;
 
 	// Scrollbar stuff.
 	int						m_pageSize;
@@ -75,6 +78,7 @@ private:
 
 	void					OnDrag(bool initial);
 	void					OnPaint(HDC ctrlDC);
-	void					AdjustSize();
+	void					AdjustSize(unsigned int requiredWidth);
 	void					RenderCodeImg();
+	void					RemoveWndProcHook();
 };
