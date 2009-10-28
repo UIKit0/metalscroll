@@ -17,6 +17,7 @@
 #include "MetalScrollPCH.h"
 #include "MetalBar.h"
 #include "OptionsDialog.h"
+#include "TextEventHandler.h"
 
 extern CComPtr<IVsTextManager>		g_textMgr;
 
@@ -60,11 +61,18 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 	s_bars.insert(this);
 
 	AdjustSize(s_barWidth);
+
+	m_eventHandler = CTextEventHandler::CreateHandler(this);
 }
 
 MetalBar::~MetalBar()
 {
-	// Free the document.
+	// Release the various COM things we used.
+	if(m_eventHandler)
+	{
+		m_eventHandler->RemoveHandler();
+		m_eventHandler->Release();
+	}
 	if(m_view)
 		m_view->Release();
 
@@ -502,7 +510,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	BitBlt(ctrlDC, clRect.left, clRect.top, s_barWidth, barHeight, m_backBufferDC, 0, 0, SRCCOPY);
 }
 
-void MetalBar::OnCodeChanged(TextPoint* /*startPoint*/, TextPoint* /*endPoint*/)
+void MetalBar::OnCodeChanged(const TextLineChange* /*textLineChange*/)
 {
 	m_codeImgDirty = true;
 	InvalidateRect(m_hwnd, 0, 0);

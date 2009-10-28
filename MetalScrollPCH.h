@@ -35,6 +35,7 @@
 #include <atlcom.h>
 #include <commctrl.h>
 #include <set>
+#include <assert.h>
 
 #pragma warning( disable : 4278 )
 #pragma warning( disable : 4146 )

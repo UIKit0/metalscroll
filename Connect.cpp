@@ -15,7 +15,6 @@
 */
 
 #include "MetalScrollPCH.h"
-#include "AddIn.h"
 #include "Connect.h"
 #include "MetalBar.h"
 #include "ColorChip.h"
