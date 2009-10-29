@@ -19,6 +19,7 @@
 using namespace EnvDTE;
 
 class CTextEventHandler;
+class Intervals;
 
 class MetalBar
 {
@@ -83,6 +84,7 @@ private:
 	void						OnDrag(bool initial);
 	void						OnPaint(HDC ctrlDC);
 	void						AdjustSize(unsigned int requiredWidth);
+	void						GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn);
 	void						RenderCodeImg();
 	void						RemoveWndProcHook();
 };

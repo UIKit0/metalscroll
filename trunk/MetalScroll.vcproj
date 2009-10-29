@@ -253,6 +253,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Intervals.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\MetalBar.cpp"
 				>
 			</File>
@@ -296,6 +300,10 @@
 			</File>
 			<File
 				RelativePath="Connect.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Intervals.h"
 				>
 			</File>
 			<File
