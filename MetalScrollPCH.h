@@ -34,8 +34,6 @@
 #include <atlbase.h>
 #include <atlcom.h>
 #include <commctrl.h>
-#include <set>
-#include <assert.h>
 
 #pragma warning( disable : 4278 )
 #pragma warning( disable : 4146 )
@@ -89,3 +87,8 @@ private:
 #define COLORREF_TO_RGB(cr) ((cr & 0xff00) | ((cr & 0xff) << 16) | ((cr & 0xff0000) >> 16) | 0xff000000)
 
 extern CAddInModule _AtlModule;
+
+#include <assert.h>
+#include <vector>
+#include <set>
+#include <algorithm>

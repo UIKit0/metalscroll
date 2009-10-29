@@ -18,9 +18,11 @@
 #include "MetalBar.h"
 #include "OptionsDialog.h"
 #include "TextEventHandler.h"
+#include "Intervals.h"
 
 #define REFRESH_CODE_TIMER_ID		1
 
+extern CComPtr<EnvDTE80::DTE2>		g_dte;
 extern CComPtr<IVsTextManager>		g_textMgr;
 
 unsigned int MetalBar::s_barWidth;
@@ -283,12 +285,54 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 	return CallWindowProc(oldProc, hwnd, message, wparam, lparam);
 }
 
+void MetalBar::GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn)
+{
+	CComQIPtr<IServiceProvider> sp = g_dte;
+	if(!sp)
+		return;
+
+	CComPtr<IVsHiddenTextManager> hiddenMgr;
+	HRESULT hr = sp->QueryService(SID_SVsTextManager, IID_IVsHiddenTextManager, (void**)&hiddenMgr);
+	if(FAILED(hr) || !hiddenMgr)
+		return;
+
+	CComPtr<IVsHiddenTextSession> hiddenSess;
+	hr = hiddenMgr->GetHiddenTextSession(buffer, &hiddenSess);
+	if(FAILED(hr) || !hiddenSess)
+		return;
+
+	CComPtr<IVsEnumHiddenRegions> hiddenEnum;
+	hr = hiddenSess->EnumHiddenRegions(FHR_ALL_REGIONS, 0, 0, &hiddenEnum);
+	if(FAILED(hr) || !hiddenEnum)
+		return;
+
+	ULONG numRegions;
+	IVsHiddenRegion* region;
+	while( SUCCEEDED(hiddenEnum->Next(1, &region, &numRegions)) && numRegions )
+	{
+		DWORD state;
+		region->GetState(&state);
+		if(state == chrDefault)
+		{
+			TextSpan span;
+			region->GetSpan(&span);
+			if(span.iStartLine + 1 < span.iEndLine)
+				hiddenRgn.Add(span.iStartLine + 1, span.iEndLine);
+		}
+
+		region->Release();
+	}
+}
+
 void MetalBar::RenderCodeImg()
 {
 	CComPtr<IVsTextLines> lines;
 	HRESULT hr = m_view->GetBuffer(&lines);
 	if(FAILED(hr) || !lines)
 		return;
+
+	Intervals hiddenRgn;
+	GetHiddenLines(lines, hiddenRgn);
 
 	unsigned int tabSize;
 	LANGPREFERENCES langPrefs;
@@ -339,6 +383,9 @@ void MetalBar::RenderCodeImg()
 		CommentType_MultiLine
 	} commentType = CommentType_None;
 	
+	hiddenRgn.BeginScan();
+
+	int realNumLines = 0;
 	for(wchar_t* chr = text; *chr; ++chr)
 	{
 		// Check for newline.
@@ -352,8 +399,21 @@ void MetalBar::RenderCodeImg()
 			for(unsigned int i = linePos; i < s_barWidth; ++i)
 				pixel[i] = s_whitespaceColor;
 
-			linePos = 0;
-			pixel -= s_barWidth;
+			hiddenRgn.NextValue();
+			if(!hiddenRgn.IsCurrentValueInside())
+			{
+				// Advance the image pointer.
+				linePos = 0;
+				pixel -= s_barWidth;
+				++realNumLines;
+			}
+			else
+			{
+				// Setting linePos to s_barWidth will prevent the code below from trying to draw
+				// this line (as it's hidden).
+				linePos = s_barWidth;
+			}
+
 			if(commentType == CommentType_SingleLine)
 				commentType = CommentType_None;
 			continue;
@@ -419,6 +479,8 @@ void MetalBar::RenderCodeImg()
 	// Fill the remaining pixels of the first line.
 	for(; linePos < s_barWidth; ++linePos)
 		pixel[linePos] = s_whitespaceColor;
+
+	m_numLines = realNumLines;
 
 	if(!m_imgDC)
 		m_imgDC = CreateCompatibleDC(0);
