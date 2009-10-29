@@ -30,6 +30,7 @@ public:
 	IVsTextView*				GetView() const { return m_view; }
 	LRESULT						WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 	void						OnCodeChanged(const TextLineChange* textLineChange);
+	void						OnSave();
 
 	static void					ResetSettings();
 	static void					ReadSettings();

@@ -28,7 +28,8 @@ class ATL_NO_VTABLE CConnect :
 	public CComCoClass<CConnect, &CLSID_Connect>,
 	public IDispatchImpl<_IDTExtensibility2, &IID__IDTExtensibility2, &LIBID_AddInDesignerObjects, 1, 0>,
 	public IDispatchImpl<IVsTextManagerEvents, &__uuidof(IVsTextManagerEvents), &LIBID_TextManagerInternal>,
-	public IDispatchImpl<IVsTextViewEvents, &__uuidof(IVsTextViewEvents), &LIBID_TextManagerInternal>
+	public IDispatchImpl<IVsTextViewEvents, &__uuidof(IVsTextViewEvents), &LIBID_TextManagerInternal>,
+	public IDispatchImpl<IVsRunningDocTableEvents, &__uuidof(IVsRunningDocTableEvents), &LIBID_VsShell>
 {
 public:
 	CConnect();
@@ -41,6 +42,7 @@ public:
 		COM_INTERFACE_ENTRY(IDTExtensibility2)
 		COM_INTERFACE_ENTRY(IVsTextManagerEvents)
 		COM_INTERFACE_ENTRY(IVsTextViewEvents)
+		COM_INTERFACE_ENTRY(IVsRunningDocTableEvents)
 	END_COM_MAP()
 
 	DECLARE_PROTECT_FINAL_CONSTRUCT()
@@ -73,8 +75,17 @@ public:
 	void STDMETHODCALLTYPE		OnChangeScrollInfo(IVsTextView* /*view*/, long /*bar*/, long /*minUnit*/, long /*maxUnits*/, long /*visibleUnits*/, long /*firstVisibleUnit*/) {}
 	void STDMETHODCALLTYPE		OnChangeCaretLine(IVsTextView* /*view*/, long /*newLine*/, long /*oldLine*/) {}
 
+	// IVsRunningDocTableEvents implementation.
+	STDMETHOD(OnAfterFirstDocumentLock)(VSCOOKIE /*docCookie*/, VSRDTFLAGS /*dwRDTLockType*/, DWORD /*dwReadLocksRemaining*/, DWORD /*dwEditLocksRemaining*/) { return S_OK; }
+	STDMETHOD(OnBeforeLastDocumentUnlock)(VSCOOKIE /*docCookie*/, VSRDTFLAGS /*dwRDTLockType*/, DWORD /*dwReadLocksRemaining*/, DWORD /*dwEditLocksRemaining*/) { return S_OK; }
+	STDMETHOD(OnAfterSave)(VSCOOKIE docCookie);
+	STDMETHOD(OnAfterAttributeChange)(VSCOOKIE /*docCookie*/, VSRDTATTRIB /*grfAttribs*/) { return S_OK; }
+	STDMETHOD(OnBeforeDocumentWindowShow)(VSCOOKIE /*docCookie*/, BOOL /*fFirstShow*/, IVsWindowFrame* /*pFrame*/) { return S_OK; }
+	STDMETHOD(OnAfterDocumentWindowHide)(VSCOOKIE /*docCookie*/, IVsWindowFrame* /*pFrame*/) { return S_OK; }
+
 private:
 	DWORD						m_textMgrEventsCookie;
+	DWORD						m_docEventsCookie;
 
 	bool						GetTextManagerEventsPlug(IConnectionPoint** connPt);
 	bool						GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* view);
