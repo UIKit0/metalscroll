@@ -54,6 +54,7 @@
 #pragma warning( default : 4278 )
 
 #include <textmgr.h>
+#include <vsshell.h>
 
 class DECLSPEC_UUID("694BCCDA-B2B0-4A97-BB4B-E7B128B05D76") MetalScrollLib;
 

@@ -594,6 +594,10 @@ void MetalBar::OnCodeChanged(const TextLineChange* /*textLineChange*/)
 	SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, 1000, 0);
 }
 
+void MetalBar::OnSave()
+{
+}
+
 void MetalBar::ResetSettings()
 {
 	s_barWidth = 64;
