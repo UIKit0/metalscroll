@@ -32,6 +32,8 @@ void OptionsDialog::InitDialog(HWND hwnd)
 	m_matchingWord.Init(GetDlgItem(hwnd, IDC_MATCHING_WORD), MetalBar::s_matchColor);
 	m_modifLineSaved.Init(GetDlgItem(hwnd, IDC_MODIF_LINE_SAVED), MetalBar::s_modifiedLineColor);
 	m_modifLineUnsaved.Init(GetDlgItem(hwnd, IDC_MODIF_LINE_UNSAVED), MetalBar::s_unsavedLineColor);
+	m_breakpoints.Init(GetDlgItem(hwnd, IDC_BREAKPOINTS), MetalBar::s_breakpointColor);
+	m_bookmarks.Init(GetDlgItem(hwnd, IDC_BOOKMARKS), MetalBar::s_bookmarkColor);
 	m_cursorColor.Init(GetDlgItem(hwnd, IDC_CURSOR_COLOR), MetalBar::s_cursorColor);
 
 	m_cursorTrans = MetalBar::s_cursorColor >> 24;
@@ -126,6 +128,8 @@ void OptionsDialog::Execute()
 	MetalBar::s_matchColor = m_matchingWord.GetColor();
 	MetalBar::s_modifiedLineColor = m_modifLineSaved.GetColor();
 	MetalBar::s_unsavedLineColor = m_modifLineUnsaved.GetColor();
+	MetalBar::s_breakpointColor = m_breakpoints.GetColor();
+	MetalBar::s_bookmarkColor = m_bookmarks.GetColor();
 	MetalBar::s_cursorColor = (m_cursorColor.GetColor() & 0xffffff) | ((m_cursorTrans & 0xff) << 24);
 
 	MetalBar::s_barWidth = m_barWidth;

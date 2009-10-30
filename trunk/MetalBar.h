@@ -30,7 +30,6 @@ public:
 	IVsTextView*				GetView() const { return m_view; }
 	LRESULT						WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 	void						OnCodeChanged(const TextLineChange* textLineChange);
-	void						OnSave();
 
 	static void					ResetSettings();
 	static void					ReadSettings();
@@ -48,8 +47,18 @@ public:
 	static unsigned int			s_matchColor;
 	static unsigned int			s_modifiedLineColor;
 	static unsigned int			s_unsavedLineColor;
+	static unsigned int			s_breakpointColor;
+	static unsigned int			s_bookmarkColor;
 
 private:
+	enum LineMarker
+	{
+		LineMarker_ChangedUnsaved = 0x01,
+		LineMarker_ChangedSaved = 0x02,
+		LineMarker_Breakpoint = 0x04,
+		LineMarker_Bookmark = 0x08
+	};
+
 	static std::set<MetalBar*>	s_bars;
 	static bool					ReadRegInt(unsigned int* to, HKEY key, const char* name);
 	static void					WriteRegInt(HKEY key, const char* name, unsigned int val);
@@ -86,6 +95,9 @@ private:
 	void						OnPaint(HDC ctrlDC);
 	void						AdjustSize(unsigned int requiredWidth);
 	void						GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn);
+	void						FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int type, unsigned char flag);
+	void						GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int numLines);
+	void						PaintMarkers(unsigned int* line, unsigned char flags);
 	void						RenderCodeImg();
 	void						RemoveWndProcHook();
 };

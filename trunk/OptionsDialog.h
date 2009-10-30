@@ -41,6 +41,8 @@ private:
 	ColorChip					m_modifLineSaved;
 	ColorChip					m_modifLineUnsaved;
 	ColorChip					m_cursorColor;
+	ColorChip					m_breakpoints;
+	ColorChip					m_bookmarks;
 	unsigned int				m_cursorTrans;
 	unsigned int				m_barWidth;
 
