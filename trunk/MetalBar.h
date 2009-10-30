@@ -16,8 +16,6 @@
 
 #pragma once
 
-using namespace EnvDTE;
-
 class Intervals;
 
 class MetalBar

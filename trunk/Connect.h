@@ -20,8 +20,6 @@
 #include "AddIn.h"
 
 using namespace AddInDesignerObjects;
-using namespace EnvDTE;
-using namespace EnvDTE80;
 
 class ATL_NO_VTABLE CConnect : 
 	public CComObjectRootEx<CComSingleThreadModel>,

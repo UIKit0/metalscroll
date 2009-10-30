@@ -21,8 +21,8 @@
 
 extern CAddInModule _AtlModule;
 
-CComPtr<DTE2>						g_dte;
-CComPtr<AddIn>						g_addInInstance;
+CComPtr<EnvDTE80::DTE2>				g_dte;
+CComPtr<EnvDTE::AddIn>				g_addInInstance;
 CComPtr<IVsTextManager>				g_textMgr;
 
 CConnect::CConnect()
@@ -52,11 +52,11 @@ bool CConnect::GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* vie
 
 STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*connectMode*/, IDispatch* addInInst, SAFEARRAY** /*custom*/)
 {
-	HRESULT hr = application->QueryInterface(__uuidof(DTE2), (void**)&g_dte);
+	HRESULT hr = application->QueryInterface(__uuidof(EnvDTE80::DTE2), (void**)&g_dte);
 	if(FAILED(hr))
 		return hr;
 
-	hr = addInInst->QueryInterface(__uuidof(AddIn), (void**)&g_addInInstance);
+	hr = addInInst->QueryInterface(__uuidof(EnvDTE::AddIn), (void**)&g_addInInstance);
 	if(FAILED(hr))
 		return hr;
 
