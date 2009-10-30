@@ -18,7 +18,6 @@
 
 using namespace EnvDTE;
 
-class CTextEventHandler;
 class Intervals;
 
 class MetalBar
@@ -29,7 +28,6 @@ public:
 
 	IVsTextView*				GetView() const { return m_view; }
 	LRESULT						WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
-	void						OnCodeChanged(const TextLineChange* textLineChange);
 
 	static void					ResetSettings();
 	static void					ReadSettings();
@@ -72,7 +70,6 @@ private:
 	// Text.
 	IVsTextView*				m_view;
 	long						m_numLines;
-	CTextEventHandler*			m_eventHandler;
 
 	// Painting.
 	bool						m_codeImgDirty;

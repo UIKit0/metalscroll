@@ -284,10 +284,6 @@
 				RelativePath=".\OptionsDialog.cpp"
 				>
 			</File>
-			<File
-				RelativePath=".\TextEventHandler.cpp"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -322,10 +318,6 @@
 				RelativePath=".\Resource.h"
 				>
 			</File>
-			<File
-				RelativePath=".\TextEventHandler.h"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
@@ -342,10 +334,6 @@
 			</File>
 			<File
 				RelativePath=".\AddIn.rgs"
-				>
-			</File>
-			<File
-				RelativePath=".\TextEventHandler.rgs"
 				>
 			</File>
 		</Filter>
