@@ -242,12 +242,18 @@ STDMETHODIMP CConnect::GetTextMarkerType(GUID* guidMarker, IVsPackageDefinedText
 
 STDMETHODIMP CConnect::GetVisualStyle(DWORD* visualFlags)
 {
+	if(!visualFlags)
+		return E_POINTER;
+
 	*visualFlags = MV_COLOR_ALWAYS;
 	return S_OK;
 }
 
 STDMETHODIMP CConnect::GetDefaultColors(COLORINDEX* foreground, COLORINDEX* background)
 {
+	if(!foreground || !background)
+		return E_POINTER;
+
 	*foreground = CI_BLACK;
 	*background = CI_CYAN;
 	return S_OK;
@@ -256,6 +262,9 @@ STDMETHODIMP CConnect::GetDefaultColors(COLORINDEX* foreground, COLORINDEX* back
 STDMETHODIMP CConnect::GetDefaultLineStyle(COLORINDEX* lineColor, LINESTYLE* lineIndex)
 {
 	// This shouldn't be called because we haven't requested MV_LINE or MV_BORDER.
+	if(!lineColor || !lineIndex)
+		return E_POINTER;
+
 	*lineColor = CI_BLACK;
 	*lineIndex = LI_SOLID;
 	return S_OK;
@@ -263,6 +272,9 @@ STDMETHODIMP CConnect::GetDefaultLineStyle(COLORINDEX* lineColor, LINESTYLE* lin
 
 STDMETHODIMP CConnect::GetDefaultFontFlags(DWORD* fontFlags)
 {
+	if(!fontFlags)
+		return E_POINTER;
+
 	*fontFlags = FF_DEFAULT;
 	return S_OK;
 }
@@ -275,12 +287,18 @@ STDMETHODIMP CConnect::DrawGlyphWithColors(HDC /*hdc*/, RECT* /*rect*/, long /*m
 
 STDMETHODIMP CConnect::GetBehaviorFlags(DWORD* flags)
 {
+	if(!flags)
+		return E_POINTER;
+
 	*flags = MB_DEFAULT;
 	return S_OK;
 }
 
 STDMETHODIMP CConnect::GetPriorityIndex(long* priorityIndex)
 {
+	if(!priorityIndex)
+		return E_POINTER;
+
 	*priorityIndex = 100;
 	return S_OK;
 }
