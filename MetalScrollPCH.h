@@ -28,16 +28,16 @@
 #define NOMINMAX
 
 #define _ATL_APARTMENT_THREADED
-#define _ATL_NO_AUTOMATIC_NAMESPACE
 #define _ATL_CSTRING_EXPLICIT_CONSTRUCTORS
 #define _ATL_ALL_WARNINGS
+
+#pragma warning(push)
+#pragma warning(disable: 4278)
+#pragma warning(disable: 4146)
 
 #include <atlbase.h>
 #include <atlcom.h>
 #include <commctrl.h>
-
-#pragma warning( disable : 4278 )
-#pragma warning( disable : 4146 )
 
 // IDTExtensibility2
 #import "libid:AC0714F2-3D04-11D1-AE7D-00A0C90F26F4" version("1.0") lcid("0")  raw_interfaces_only named_guids
@@ -51,15 +51,12 @@
 // DTE80
 #import "libid:1A31287A-4D7D-413e-8E32-3B374931BD89" version("8.0") lcid("0") raw_interfaces_only named_guids
 
-#pragma warning( default : 4146 )
-#pragma warning( default : 4278 )
+#pragma warning(pop)
 
 #include <textmgr.h>
 #include <vsshell.h>
 
 class DECLSPEC_UUID("694BCCDA-B2B0-4A97-BB4B-E7B128B05D76") MetalScrollLib;
-
-using namespace ATL;
 
 class CAddInModule : public CAtlDllModuleT< CAddInModule >
 {

@@ -381,16 +381,16 @@ bool MetalBar::GetFileName(CComBSTR& name, IVsTextLines* buffer)
 	if(FAILED(hr) || !disp)
 		return false;
 
-	CComQIPtr<EditPoint> ep = disp;
+	CComQIPtr<EnvDTE::EditPoint> ep = disp;
 	if(!ep)
 		return false;
 
-	CComPtr<TextDocument> txtDoc;
+	CComPtr<EnvDTE::TextDocument> txtDoc;
 	hr = ep->get_Parent(&txtDoc);
 	if(FAILED(hr) || !txtDoc)
 		return false;
 
-	CComPtr<Document> doc;
+	CComPtr<EnvDTE::Document> doc;
 	hr = txtDoc->get_Parent(&doc);
 	if(FAILED(hr) || !doc)
 		return false;
@@ -405,12 +405,12 @@ void MetalBar::FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines
 	if(!GetFileName(fileName, buffer))
 		return;
 
-	CComPtr<Debugger> debugger;
+	CComPtr<EnvDTE::Debugger> debugger;
 	HRESULT hr = g_dte->get_Debugger(&debugger);
 	if(FAILED(hr) || !debugger)
 		return;
 
-	CComPtr<Breakpoints> breakpoints;
+	CComPtr<EnvDTE::Breakpoints> breakpoints;
 	hr = debugger->get_Breakpoints(&breakpoints);
 	if(FAILED(hr) || !breakpoints)
 		return;
@@ -422,14 +422,14 @@ void MetalBar::FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines
 
 	for(int bpIdx = 1; bpIdx <= numBp; ++bpIdx)
 	{
-		CComPtr<Breakpoint> breakpoint;
+		CComPtr<EnvDTE::Breakpoint> breakpoint;
 		hr = breakpoints->Item(CComVariant(bpIdx), &breakpoint);
 		if(FAILED(hr) || !breakpoint)
 			continue;
 
-		dbgBreakpointLocationType bpType;
+		EnvDTE::dbgBreakpointLocationType bpType;
 		hr = breakpoint->get_LocationType(&bpType);
-		if( FAILED(hr) || (bpType != dbgBreakpointLocationTypeFile) )
+		if( FAILED(hr) || (bpType != EnvDTE::dbgBreakpointLocationTypeFile) )
 			continue;
 
 		CComBSTR bpFile;
@@ -814,7 +814,7 @@ void MetalBar::ReadSettings()
 
 void MetalBar::WriteRegInt(HKEY key, const char* name, unsigned int val)
 {
-	RegSetValueEx(key, name, 0, REG_DWORD, (LPBYTE)&val, sizeof(val));
+	RegSetValueExA(key, name, 0, REG_DWORD, (LPBYTE)&val, sizeof(val));
 }
 
 void MetalBar::SaveSettings()
