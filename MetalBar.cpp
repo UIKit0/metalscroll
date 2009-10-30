@@ -648,7 +648,7 @@ void MetalBar::RenderCodeImg()
 	for(; linePos < s_barWidth; ++linePos)
 		pixel[linePos] = s_whitespaceColor;
 
-	m_numLines = realNumLines;
+	m_numLines = realNumLines + 1;
 
 	if(!m_imgDC)
 		m_imgDC = CreateCompatibleDC(0);
