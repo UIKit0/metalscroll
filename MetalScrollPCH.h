@@ -37,6 +37,7 @@
 
 #include <atlbase.h>
 #include <atlcom.h>
+#include <atlstr.h>
 #include <commctrl.h>
 
 // IDTExtensibility2
@@ -53,6 +54,7 @@
 
 #pragma warning(pop)
 
+#include <VSLPackage.h>
 #include <textmgr.h>
 #include <vsshell.h>
 

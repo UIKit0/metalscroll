@@ -261,6 +261,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\MetalScrollPackage.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\MetalScrollPCH.cpp"
 				>
 				<FileConfiguration
@@ -307,6 +311,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\MetalScrollPackage.h"
+				>
+			</File>
+			<File
 				RelativePath=".\MetalScrollPCH.h"
 				>
 			</File>
@@ -334,6 +342,10 @@
 			</File>
 			<File
 				RelativePath=".\AddIn.rgs"
+				>
+			</File>
+			<File
+				RelativePath=".\MetalScrollPackage.rgs"
 				>
 			</File>
 		</Filter>
