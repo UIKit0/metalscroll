@@ -20,7 +20,7 @@
 #include "Intervals.h"
 
 #define REFRESH_CODE_TIMER_ID		1
-#define REFRESH_CODE_INTERVAL		1000
+#define REFRESH_CODE_INTERVAL		2000
 
 extern CComPtr<EnvDTE80::DTE2>		g_dte;
 extern CComPtr<IVsTextManager>		g_textMgr;
@@ -211,6 +211,13 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 				m_scrollPos = si->nPos;
 			if(si->fMask & SIF_RANGE)
 			{
+				if( (m_scrollMin != si->nMin) || (m_scrollMax != si->nMax) )
+				{
+					// This event fires when the code changes, when a region is hidden/shown etc. We need to
+					// update the code image in all those cases.
+					m_codeImgDirty = true;
+				}
+
 				m_scrollMin = si->nMin;
 				m_scrollMax = si->nMax;
 			}
@@ -233,8 +240,13 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			return m_scrollPos;
 
 		case SBM_SETRANGE:
-			m_scrollMin = (int)wparam;
-			m_scrollMax = (int)lparam;
+			if( (m_scrollMin != (int)wparam) || (m_scrollMax != (int)lparam) )
+			{
+				m_scrollMin = (int)wparam;
+				m_scrollMax = (int)lparam;
+				m_codeImgDirty = true;
+				InvalidateRect(hwnd, 0, FALSE);
+			}
 			return m_scrollPos;
 
 		case WM_LBUTTONDOWN:
@@ -318,12 +330,25 @@ void MetalBar::GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn)
 	}
 }
 
+void MetalBar::MarkLineRange(std::vector<unsigned char>& markers, unsigned char flag, int start, int end)
+{
+	// Mark the surrounding lines too, because single-pixel margins are impossible to see.
+	int extraLines;
+	if((int)m_backBufferHeight < m_numLines)
+		extraLines = int(2.0f * m_numLines / m_backBufferHeight);
+	else
+		extraLines = 2;
+
+	start = std::max(start - extraLines, 0);
+	end = std::min(end + extraLines, (int)m_numLines - 1);
+	for(int i = start; i <= end; ++i)
+		markers[i] |= flag;
+}
+
 void MetalBar::FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int type, unsigned char flag)
 {
-	int numLines = (int)markers.size();
-
 	CComPtr<IVsEnumLineMarkers> enumMarkers;
-	HRESULT hr = buffer->EnumMarkers(0, 0, numLines, 0, type, 0, &enumMarkers);
+	HRESULT hr = buffer->EnumMarkers(0, 0, m_numLines, 0, type, 0, &enumMarkers);
 	if(FAILED(hr) || !enumMarkers)
 		return;
 
@@ -344,11 +369,7 @@ void MetalBar::FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* bu
 		if(FAILED(hr))
 			continue;
 
-		// Mark the surrounding lines too, because single-pixel margins are impossible to see.
-		int start = std::max((int)span.iStartLine - 2, 0);
-		int end = std::min((int)span.iEndLine + 3, numLines);
-		for(int i = start; i < end; ++i)
-			markers[i] |= flag;
+		MarkLineRange(markers, flag, span.iStartLine, span.iEndLine);
 	}
 }
 
@@ -380,8 +401,6 @@ bool MetalBar::GetFileName(CComBSTR& name, IVsTextLines* buffer)
 
 void MetalBar::FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines* buffer)
 {
-	int numLines = (int)markers.size();
-
 	CComBSTR fileName;
 	if(!GetFileName(fileName, buffer))
 		return;
@@ -426,17 +445,13 @@ void MetalBar::FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines
 		if(FAILED(hr))
 			continue;
 
-		// Mark the surrounding lines too, because single-pixel margins are impossible to see.
-		int start = std::max((int)line - 2, 0);
-		int end = std::min((int)line + 3, numLines);
-		for(int i = start; i < end; ++i)
-			markers[i] |= LineMarker_Breakpoint;
+		MarkLineRange(markers, LineMarker_Breakpoint, line, line);
 	}
 }
 
-void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int numLines)
+void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer)
 {
-	markers.resize(numLines, 0);
+	markers.resize(m_numLines, 0);
 
 	// The magic IDs for the changed lines are not in the MARKERTYPE enum, because they are useful and
 	// we wouldn't want people to have access to useful stuff. I found them by disassembling RockScroll.
@@ -489,7 +504,7 @@ void MetalBar::RenderCodeImg()
 	GetHiddenLines(lines, hiddenRgn);
 
 	std::vector<unsigned char> markers;
-	GetMarkers(markers, lines, m_numLines);
+	GetMarkers(markers, lines);
 
 	long numCharsLastLine;
 	hr = lines->GetLengthOfLine(m_numLines - 1, &numCharsLastLine);
@@ -642,14 +657,6 @@ void MetalBar::RenderCodeImg()
 
 void MetalBar::OnPaint(HDC ctrlDC)
 {
-	if(!m_codeImg || m_codeImgDirty)
-	{
-		RenderCodeImg();
-		m_codeImgDirty = false;
-		// Re-arm the refresh timer.
-		SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
-	}
-
 	BLENDFUNCTION blendFunc;
 	blendFunc.BlendOp = AC_SRC_OVER;
 	blendFunc.BlendFlags = 0;
@@ -680,6 +687,14 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		SelectObject(m_backBufferDC, m_backBufferImg);
 		m_backBufferWidth = s_barWidth;
 		m_backBufferHeight = barHeight;
+	}
+
+	if(!m_codeImg || m_codeImgDirty)
+	{
+		RenderCodeImg();
+		m_codeImgDirty = false;
+		// Re-arm the refresh timer.
+		SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
 	}
 
 	// Blit or scale the code image.

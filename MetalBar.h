@@ -92,10 +92,11 @@ private:
 	void						OnPaint(HDC ctrlDC);
 	void						AdjustSize(unsigned int requiredWidth);
 	void						GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn);
+	void						MarkLineRange(std::vector<unsigned char>& markers, unsigned char flag, int start, int end);
 	void						FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int type, unsigned char flag);
 	bool						GetFileName(CComBSTR& name, IVsTextLines* buffer);
 	void						FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines* buffer);
-	void						GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int numLines);
+	void						GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer);
 	void						PaintMarkers(unsigned int* line, unsigned char flags);
 	void						RenderCodeImg();
 	void						RemoveWndProcHook();
