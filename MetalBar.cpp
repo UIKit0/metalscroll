@@ -352,6 +352,88 @@ void MetalBar::FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* bu
 	}
 }
 
+bool MetalBar::GetFileName(CComBSTR& name, IVsTextLines* buffer)
+{
+	// Behold the absolutely ridiculous way of getting the file name for a given text buffer.
+	CComPtr<IDispatch> disp;
+	HRESULT hr = buffer->CreateEditPoint(0, 0, &disp);
+	if(FAILED(hr) || !disp)
+		return false;
+
+	CComQIPtr<EditPoint> ep = disp;
+	if(!ep)
+		return false;
+
+	CComPtr<TextDocument> txtDoc;
+	hr = ep->get_Parent(&txtDoc);
+	if(FAILED(hr) || !txtDoc)
+		return false;
+
+	CComPtr<Document> doc;
+	hr = txtDoc->get_Parent(&doc);
+	if(FAILED(hr) || !doc)
+		return false;
+
+	hr = doc->get_FullName(&name);
+	return SUCCEEDED(hr) && name;
+}
+
+void MetalBar::FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines* buffer)
+{
+	int numLines = (int)markers.size();
+
+	CComBSTR fileName;
+	if(!GetFileName(fileName, buffer))
+		return;
+
+	CComPtr<Debugger> debugger;
+	HRESULT hr = g_dte->get_Debugger(&debugger);
+	if(FAILED(hr) || !debugger)
+		return;
+
+	CComPtr<Breakpoints> breakpoints;
+	hr = debugger->get_Breakpoints(&breakpoints);
+	if(FAILED(hr) || !breakpoints)
+		return;
+
+	long numBp;
+	hr = breakpoints->get_Count(&numBp);
+	if(FAILED(hr))
+		return;
+
+	for(int bpIdx = 1; bpIdx <= numBp; ++bpIdx)
+	{
+		CComPtr<Breakpoint> breakpoint;
+		hr = breakpoints->Item(CComVariant(bpIdx), &breakpoint);
+		if(FAILED(hr) || !breakpoint)
+			continue;
+
+		dbgBreakpointLocationType bpType;
+		hr = breakpoint->get_LocationType(&bpType);
+		if( FAILED(hr) || (bpType != dbgBreakpointLocationTypeFile) )
+			continue;
+
+		CComBSTR bpFile;
+		hr = breakpoint->get_File(&bpFile);
+		if(FAILED(hr) || !bpFile)
+			continue;
+
+		if(_wcsicmp(bpFile, fileName) != 0)
+			continue;
+
+		long line;
+		hr = breakpoint->get_FileLine(&line);
+		if(FAILED(hr))
+			continue;
+
+		// Mark the surrounding lines too, because single-pixel margins are impossible to see.
+		int start = std::max((int)line - 2, 0);
+		int end = std::min((int)line + 3, numLines);
+		for(int i = start; i < end; ++i)
+			markers[i] |= LineMarker_Breakpoint;
+	}
+}
+
 void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int numLines)
 {
 	markers.resize(numLines, 0);
@@ -361,6 +443,9 @@ void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buf
 	FindMarkers(markers, buffer, 0x13, LineMarker_ChangedUnsaved);
 	FindMarkers(markers, buffer, 0x14, LineMarker_ChangedSaved);
 	FindMarkers(markers, buffer, MARKER_BOOKMARK, LineMarker_Bookmark);
+
+	// Breakpoints must be retrieved in a different way.
+	FindBreakpoints(markers, buffer);
 }
 
 void MetalBar::PaintMarkers(unsigned int* line, unsigned char flags)
