@@ -16,7 +16,9 @@
 #define IDC_CURSOR_COLOR                208
 #define IDC_BAR_WIDTH                   209
 #define IDC_CURSOR_TRANS                210
+#define IDC_BREAKPOINTS                 211
 #define IDC_RESET                       212
+#define IDC_BOOKMARKS                   213
 
 // Next default values for new objects
 // 

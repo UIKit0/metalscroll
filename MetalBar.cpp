@@ -34,6 +34,9 @@ unsigned int MetalBar::s_cursorColor;
 unsigned int MetalBar::s_matchColor;
 unsigned int MetalBar::s_modifiedLineColor;
 unsigned int MetalBar::s_unsavedLineColor;
+unsigned int MetalBar::s_breakpointColor;
+unsigned int MetalBar::s_bookmarkColor;
+
 std::set<MetalBar*> MetalBar::s_bars;
 
 MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IVsTextView* view)
@@ -324,15 +327,74 @@ void MetalBar::GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn)
 	}
 }
 
+void MetalBar::FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int type, unsigned char flag)
+{
+	int numLines = (int)markers.size();
+
+	CComPtr<IVsEnumLineMarkers> enumMarkers;
+	HRESULT hr = buffer->EnumMarkers(0, 0, numLines, 0, type, 0, &enumMarkers);
+	if(FAILED(hr) || !enumMarkers)
+		return;
+
+	long numMarkers;
+	hr = enumMarkers->GetCount(&numMarkers);
+	if(FAILED(hr))
+		return;
+
+	for(int m = 0; m < numMarkers; ++m)
+	{
+		CComPtr<IVsTextLineMarker> marker;
+		hr = enumMarkers->Next(&marker);
+		if(FAILED(hr))
+			break;
+
+		TextSpan span;
+		hr = marker->GetCurrentSpan(&span);
+		if(FAILED(hr))
+			continue;
+
+		// Mark the surrounding lines too, because single-pixel margins are impossible to see.
+		int start = std::max((int)span.iStartLine - 2, 0);
+		int end = std::min((int)span.iEndLine + 3, numLines);
+		for(int i = start; i < end; ++i)
+			markers[i] |= flag;
+	}
+}
+
+void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int numLines)
+{
+	markers.resize(numLines, 0);
+
+	FindMarkers(markers, buffer, 0x13, LineMarker_ChangedUnsaved);
+	FindMarkers(markers, buffer, 0x14, LineMarker_ChangedSaved);
+	FindMarkers(markers, buffer, MARKER_BOOKMARK, LineMarker_Bookmark);
+}
+
+void MetalBar::PaintMarkers(unsigned int* line, unsigned char flags)
+{
+	if( (flags & LineMarker_ChangedUnsaved) || (flags & LineMarker_ChangedSaved) )
+	{
+		// We can get both flags on the same line because we don't mark individual lines, but take surrounding lines
+		// too (to improve visibility). In that case, the unsaved marker takes precedence.
+		unsigned int color = (flags & LineMarker_ChangedUnsaved) ? s_unsavedLineColor : s_modifiedLineColor;
+		line[0] = line[1] = line[2] = color;
+	}
+
+	if( (flags & LineMarker_Bookmark) || (flags & LineMarker_Breakpoint) )
+	{
+		// The breakpoint marker takes precedence in case both are present.
+		unsigned int color = (flags & LineMarker_Breakpoint) ? s_breakpointColor : s_bookmarkColor;
+		for(int i = 59; i < 64; ++i)
+			line[i] = color;
+	}
+}
+
 void MetalBar::RenderCodeImg()
 {
 	CComPtr<IVsTextLines> lines;
 	HRESULT hr = m_view->GetBuffer(&lines);
 	if(FAILED(hr) || !lines)
 		return;
-
-	Intervals hiddenRgn;
-	GetHiddenLines(lines, hiddenRgn);
 
 	unsigned int tabSize;
 	LANGPREFERENCES langPrefs;
@@ -344,6 +406,12 @@ void MetalBar::RenderCodeImg()
 	hr = lines->GetLineCount(&m_numLines);
 	if(FAILED(hr))
 		return;
+
+	Intervals hiddenRgn;
+	GetHiddenLines(lines, hiddenRgn);
+
+	std::vector<unsigned char> markers;
+	GetMarkers(markers, lines, m_numLines);
 
 	long numCharsLastLine;
 	hr = lines->GetLengthOfLine(m_numLines - 1, &numCharsLastLine);
@@ -386,6 +454,7 @@ void MetalBar::RenderCodeImg()
 	hiddenRgn.BeginScan();
 
 	int realNumLines = 0;
+	int currentTextLine = 0;
 	for(wchar_t* chr = text; *chr; ++chr)
 	{
 		// Check for newline.
@@ -399,7 +468,13 @@ void MetalBar::RenderCodeImg()
 			for(unsigned int i = linePos; i < s_barWidth; ++i)
 				pixel[i] = s_whitespaceColor;
 
+			// Paint the markers even if the line is hidden. This way, markers inside hidden regions are painted
+			// on the line where the region label (ellipsis) is displayed.
+			PaintMarkers(pixel, markers[currentTextLine]);
+
 			hiddenRgn.NextValue();
+			++currentTextLine;
+
 			if(!hiddenRgn.IsCurrentValueInside())
 			{
 				// Advance the image pointer.
@@ -594,10 +669,6 @@ void MetalBar::OnCodeChanged(const TextLineChange* /*textLineChange*/)
 	SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, 1000, 0);
 }
 
-void MetalBar::OnSave()
-{
-}
-
 void MetalBar::ResetSettings()
 {
 	s_barWidth = 64;
@@ -609,6 +680,8 @@ void MetalBar::ResetSettings()
 	s_matchColor = 0xffd7f600;
 	s_modifiedLineColor = 0xff0000ff;
 	s_unsavedLineColor = 0xffe1621e;
+	s_breakpointColor = 0xffff0000;
+	s_bookmarkColor = 0xff0000ff;
 }
 
 bool MetalBar::ReadRegInt(unsigned int* to, HKEY key, const char* name)
@@ -646,6 +719,8 @@ void MetalBar::ReadSettings()
 	ReadRegInt(&s_matchColor, key, "MatchedWordColor");
 	ReadRegInt(&s_modifiedLineColor, key, "ModifiedLineColor");
 	ReadRegInt(&s_unsavedLineColor, key, "UnsavedLineColor");
+	ReadRegInt(&s_breakpointColor, key, "BreakpointColor");
+	ReadRegInt(&s_bookmarkColor, key, "BookmarkColor");
 
 	RegCloseKey(key);
 }
@@ -671,6 +746,8 @@ void MetalBar::SaveSettings()
 	WriteRegInt(key, "MatchedWordColor", s_matchColor);
 	WriteRegInt(key, "ModifiedLineColor", s_modifiedLineColor);
 	WriteRegInt(key, "UnsavedLineColor", s_unsavedLineColor);
+	WriteRegInt(key, "BreakpointColor", s_breakpointColor);
+	WriteRegInt(key, "BookmarkColor", s_bookmarkColor);
 
 	RegCloseKey(key);
 

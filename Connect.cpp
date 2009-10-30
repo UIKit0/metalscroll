@@ -24,7 +24,6 @@ extern CAddInModule _AtlModule;
 CComPtr<DTE2>						g_dte;
 CComPtr<AddIn>						g_addInInstance;
 CComPtr<IVsTextManager>				g_textMgr;
-CComPtr<IVsRunningDocumentTable>	g_runningDocs;
 
 CConnect::CConnect()
 {
@@ -77,14 +76,6 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 	if(FAILED(hr))
 		return hr;
 
-	hr = sp->QueryService(SID_SVsRunningDocumentTable, IID_IVsRunningDocumentTable, (void**)&g_runningDocs);
-	if(FAILED(hr) || !g_runningDocs)
-		return E_NOINTERFACE;
-
-	hr = g_runningDocs->AdviseRunningDocTableEvents((IVsRunningDocTableEvents*)this, &m_docEventsCookie);
-	if(FAILED(hr))
-		return hr;
-	
 	MetalBar::ReadSettings();
 	ColorChip::Register();
 
@@ -100,17 +91,10 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 		m_textMgrEventsCookie = 0;
 	}
 
-	if(m_docEventsCookie && g_runningDocs)
-	{
-		g_runningDocs->UnadviseRunningDocTableEvents(m_docEventsCookie);
-		m_docEventsCookie = 0;
-	}
-
 	MetalBar::RemoveAllBars();
 	ColorChip::Unregister();
 
 	// Give up the global pointers.
-	g_runningDocs = 0;
 	g_textMgr = 0;
 	g_addInInstance = 0;
 	g_dte = 0;
@@ -211,38 +195,3 @@ void STDMETHODCALLTYPE CConnect::OnSetFocus(IVsTextView* view)
 		connData.pUnk->Release();
 	}
 }
-
-STDMETHODIMP CConnect::OnAfterSave(VSCOOKIE docCookie)
-{
-	// Find the buffer.
-	CComPtr<IUnknown> unk;
-	HRESULT hr = g_runningDocs->GetDocumentInfo(docCookie, 0, 0, 0, 0, 0, 0, &unk);
-	if(FAILED(hr))
-		return S_OK;
-
-	CComQIPtr<IVsTextBuffer> buffer = unk;
-	if(!buffer)
-		return S_OK;
-
-	// Get the view from the buffer.
-	CComPtr<IVsTextView> view;
-	hr = g_textMgr->GetActiveView(FALSE, buffer, &view);
-	if(FAILED(hr))
-		return S_OK;
-
-	// Find the scrollbar.
-	HWND hwnd = view->GetWindowHandle();
-	ScrollbarHandles handles = { 0 };
-	EnumChildWindows(GetParent(hwnd), FindScrollbars, (LPARAM)&handles);
-	if(!handles.vert)
-		return S_OK;
-
-	MetalBar* bar = (MetalBar*)GetWindowLongPtr(handles.vert, GWL_USERDATA);
-	if(!bar)
-		return S_OK;
-
-	bar->OnSave();
-
-	return S_OK;
-}
-
