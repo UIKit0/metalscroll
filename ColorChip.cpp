@@ -80,10 +80,10 @@ LRESULT FAR PASCAL ColorChip::WndProc(HWND hwnd, UINT message, WPARAM wparam, LP
 		{
 			// Handle tooltip requests.
 			NMHDR* hdr = (NMHDR*)lparam;
-			if(hdr->code != TTN_GETDISPINFO)
+			if(hdr->code != TTN_GETDISPINFOA)
 				break;
 
-			NMTTDISPINFO* toolTipInfo = (NMTTDISPINFO*)hdr;
+			NMTTDISPINFOA* toolTipInfo = (NMTTDISPINFOA*)hdr;
 			toolTipInfo->lpszText = toolTipInfo->szText;
 			toolTipInfo->hinst = 0;
 			chip->GetTooltipText(toolTipInfo->szText, _countof(toolTipInfo->szText));
@@ -96,7 +96,7 @@ LRESULT FAR PASCAL ColorChip::WndProc(HWND hwnd, UINT message, WPARAM wparam, LP
 
 void ColorChip::Register()
 {
-	WNDCLASS wndClass;
+	WNDCLASSA wndClass;
 	memset(&wndClass, 0, sizeof(wndClass));
 	wndClass.lpfnWndProc = &WndProc;
 	wndClass.hInstance = _AtlModule.GetResourceInstance();
