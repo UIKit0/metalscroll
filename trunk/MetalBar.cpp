@@ -17,10 +17,10 @@
 #include "MetalScrollPCH.h"
 #include "MetalBar.h"
 #include "OptionsDialog.h"
-#include "TextEventHandler.h"
 #include "Intervals.h"
 
 #define REFRESH_CODE_TIMER_ID		1
+#define REFRESH_CODE_INTERVAL		1000
 
 extern CComPtr<EnvDTE80::DTE2>		g_dte;
 extern CComPtr<IVsTextManager>		g_textMgr;
@@ -68,22 +68,13 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 	s_bars.insert(this);
 
 	AdjustSize(s_barWidth);
-
-	m_eventHandler = CTextEventHandler::CreateHandler(this);
 }
 
 MetalBar::~MetalBar()
 {
-	// Release the various COM things we used.
-	if(m_eventHandler)
-	{
-		m_eventHandler->RemoveHandler();
-		m_eventHandler->Release();
-	}
 	if(m_view)
 		m_view->Release();
 
-	// Free the paint stuff.
 	if(m_codeImg)
 		DeleteObject(m_codeImg);
 	if(m_backBufferImg)
@@ -365,6 +356,8 @@ void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buf
 {
 	markers.resize(numLines, 0);
 
+	// The magic IDs for the changed lines are not in the MARKERTYPE enum, because they are useful and
+	// we wouldn't want people to have access to useful stuff. I found them by disassembling RockScroll.
 	FindMarkers(markers, buffer, 0x13, LineMarker_ChangedUnsaved);
 	FindMarkers(markers, buffer, 0x14, LineMarker_ChangedSaved);
 	FindMarkers(markers, buffer, MARKER_BOOKMARK, LineMarker_Bookmark);
@@ -568,6 +561,8 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	{
 		RenderCodeImg();
 		m_codeImgDirty = false;
+		// Re-arm the refresh timer.
+		SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
 	}
 
 	BLENDFUNCTION blendFunc;
@@ -659,14 +654,6 @@ void MetalBar::OnPaint(HDC ctrlDC)
 
 	// Blit the backbuffer onto the control.
 	BitBlt(ctrlDC, clRect.left, clRect.top, s_barWidth, barHeight, m_backBufferDC, 0, 0, SRCCOPY);
-}
-
-void MetalBar::OnCodeChanged(const TextLineChange* /*textLineChange*/)
-{
-	// If the user is typing, this thing will keep resetting the timer to one second.
-	// If the user stops typing for one second, the timer message arrives and the code
-	// image is drawn. This way we don't slow down the IDE while the user is editing code.
-	SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, 1000, 0);
 }
 
 void MetalBar::ResetSettings()

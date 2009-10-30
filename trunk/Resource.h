@@ -4,7 +4,6 @@
 //
 #define IDS_PROJNAME                    100
 #define IDR_ADDIN                       101
-#define IDR_TEXTEVENTHANDLER            103
 #define IDD_OPTIONS                     201
 #define IDC_WHITESPACE                  201
 #define IDC_COMMENTS                    202

@@ -101,7 +101,6 @@ END
 //
 
 IDR_ADDIN               REGISTRY                "AddIn.rgs"
-IDR_TEXTEVENTHANDLER    REGISTRY                "TextEventHandler.rgs"
 
 /////////////////////////////////////////////////////////////////////////////
 //
