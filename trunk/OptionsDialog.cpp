@@ -110,7 +110,7 @@ void OptionsDialog::Execute()
 	if(FAILED(hr) || !mainWndHandle)
 		return;
 
-	int ret = DialogBoxParam(_AtlModule.GetResourceInstance(), (LPSTR)IDD_OPTIONS, (HWND)mainWndHandle, DlgProc, (LPARAM)this);
+	int ret = DialogBoxParamA(_AtlModule.GetResourceInstance(), (LPSTR)IDD_OPTIONS, (HWND)mainWndHandle, DlgProc, (LPARAM)this);
 	if(ret == DlgRet_Cancel)
 		return;
 
