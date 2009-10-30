@@ -16,6 +16,9 @@
 
 import "oaidl.idl";
 import "ocidl.idl";
+midl_pragma warning(disable: 2015)
+import "vsshell.idl";
+midl_pragma warning(default: 2015)
 
 [
 	uuid(694BCCDA-B2B0-4A97-BB4B-E7B128B05D76),
@@ -32,5 +35,13 @@ library MetalScrollLib
 	coclass Connect
 	{
 		[default] interface IUnknown;
+	};
+	[
+		uuid(4388225E-8798-4064-A4D7-1E2B1F4B52CF),
+		helpstring("MetalScrollPackage Class")
+	]
+	coclass MetalScrollPackage
+	{
+		[default] interface IVsPackage;
 	};
 };

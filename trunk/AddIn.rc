@@ -101,6 +101,7 @@ END
 //
 
 IDR_ADDIN               REGISTRY                "AddIn.rgs"
+IDR_METALSCROLLPACKAGE  REGISTRY                "MetalScrollPackage.rgs"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -168,7 +169,7 @@ END
 
 STRINGTABLE 
 BEGIN
-    IDS_PROJNAME            "AddIn"
+    IDS_PACKAGE_LOAD_KEY    "KJHPK1IQH2JDD8ERDEJHK2KCPQP9HIADHTPZM2IPC8CPMCH8KJEHJJMJC2AHCZPKZIM1A8EMREI8P0ZDRQPAE3E8D2HRI9MRKRMJAAJAHHIKPMR1ZRRCHZDQCIHMH8K9"
 END
 
 #endif    // English (U.S.) resources

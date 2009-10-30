@@ -1,0 +1,80 @@
+HKLM
+{
+	NoRemove 'SOFTWARE'
+	{
+		NoRemove 'Microsoft'
+		{
+			NoRemove 'VisualStudio'
+			{
+				NoRemove '8.0'
+				{
+					NoRemove 'Packages'
+					{
+						ForceRemove '{4388225E-8798-4064-A4D7-1E2B1F4B52CF}' = s 'MetalScroll'
+						{
+							val InprocServer32 = s '%MODULE%'
+							val CompanyName = s 'Griffin Software'
+							val ProductName = s 'MetalScroll'
+							val ProductVersion  = s '1.0'
+							val MinEdition  = s 'Standard'
+							val ID  = d 1
+						}
+					}
+					NoRemove 'Services'
+					{
+						ForceRemove '{454DB430-837D-4435-B7C1-F503B93EDA04}' = s '{4388225E-8798-4064-A4D7-1E2B1F4B52CF}'
+						{
+							val Name = s 'MetalScroll'
+						}
+					}
+					NoRemove 'Text Editor'
+					{
+						NoRemove 'External Markers'
+						{
+							ForceRemove '{FF447164-72F9-42ed-A767-C737B86BBD0B}' = s 'MetalScroll'
+							{
+								val DisplayName = s 'MetalScroll'
+								val Package = s '{4388225E-8798-4064-A4D7-1E2B1F4B52CF}'
+								val Service = s '{454DB430-837D-4435-B7C1-F503B93EDA04}'
+							}
+						}
+					}
+				}
+				NoRemove '9.0'
+				{
+					NoRemove Packages
+					{
+						ForceRemove {4388225E-8798-4064-A4D7-1E2B1F4B52CF} = s 'MetalScroll'
+						{
+							val InprocServer32 = s '%MODULE%'
+							val CompanyName = s 'Griffin Software'
+							val ProductName = s 'MetalScroll'
+							val ProductVersion  = s '1.0'
+							val MinEdition  = s 'Standard'
+							val ID  = d 1
+						}
+					}
+					NoRemove 'Services'
+					{
+						ForceRemove '{454DB430-837D-4435-B7C1-F503B93EDA04}' = s '{4388225E-8798-4064-A4D7-1E2B1F4B52CF}'
+						{
+							val Name = s 'MetalScroll'
+						}
+					}
+					NoRemove 'Text Editor'
+					{
+						NoRemove 'External Markers'
+						{
+							ForceRemove '{FF447164-72F9-42ed-A767-C737B86BBD0B}' = s 'MetalScroll'
+							{
+								val DisplayName = s 'MetalScroll'
+								val Package = s '{4388225E-8798-4064-A4D7-1E2B1F4B52CF}'
+								val Service = s '{454DB430-837D-4435-B7C1-F503B93EDA04}'
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

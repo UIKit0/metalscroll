@@ -25,6 +25,11 @@ CComPtr<EnvDTE80::DTE2>				g_dte;
 CComPtr<EnvDTE::AddIn>				g_addInInstance;
 CComPtr<IVsTextManager>				g_textMgr;
 
+// {454DB430-837D-4435-B7C1-F503B93EDA04} is the GUID for the marker service we register in MetalScrollPackage.rgs.
+static const GUID g_markerServGUID = { 0x454DB430, 0x837D, 0x4435, { 0xB7, 0xC1, 0xF5, 0x03, 0xB9, 0x3E, 0xDA, 0x04 } };
+// {FF447164-72F9-42ed-A767-C737B86BBD0B} is the GUID for the marker type.
+static const GUID g_markerTypeGUID = { 0xFF447164, 0x72F9, 0x42ed, { 0xA7, 0x67, 0xC7, 0x37, 0xB8, 0x6B, 0xBD, 0x0B } };
+
 CConnect::CConnect()
 {
 	m_textMgrEventsCookie = 0;
@@ -73,6 +78,16 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 		return E_NOINTERFACE;
 
 	hr = connPt->Advise((IVsTextManagerEvents*)this, &m_textMgrEventsCookie);
+	if(FAILED(hr))
+		return hr;
+
+	CComPtr<IProfferService> profferServ;
+	hr = sp->QueryService(SID_SProfferService, IID_IProfferService, (void**)&profferServ);
+	if(FAILED(hr) || !profferServ)
+		return E_NOINTERFACE;
+
+	DWORD cookie;
+	hr = profferServ->ProfferService(g_markerServGUID, (IServiceProvider*)this, &cookie);
 	if(FAILED(hr))
 		return hr;
 
@@ -194,4 +209,78 @@ void STDMETHODCALLTYPE CConnect::OnSetFocus(IVsTextView* view)
 		}
 		connData.pUnk->Release();
 	}
+}
+
+STDMETHODIMP CConnect::QueryService(REFGUID guidService, REFIID riid, void** object)
+{
+	if(!object)
+		return E_POINTER;
+
+	if(!InlineIsEqualGUID(guidService, g_markerServGUID))
+		return E_NOINTERFACE;
+
+	if(!IsEqualIID(riid, __uuidof(IVsTextMarkerTypeProvider)))
+		return E_NOINTERFACE;
+
+	*object = (IVsTextMarkerTypeProvider*)this;
+	((IVsTextMarkerTypeProvider*)this)->AddRef();
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::GetTextMarkerType(GUID* guidMarker, IVsPackageDefinedTextMarkerType** markerType)
+{
+	if(!markerType)
+		return E_POINTER;
+
+	if(!InlineIsEqualGUID(*guidMarker, g_markerTypeGUID))
+		return E_NOINTERFACE;
+
+	*markerType = (IVsPackageDefinedTextMarkerType*)this;
+	(*markerType)->AddRef();
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::GetVisualStyle(DWORD* visualFlags)
+{
+	*visualFlags = MV_COLOR_ALWAYS;
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::GetDefaultColors(COLORINDEX* foreground, COLORINDEX* background)
+{
+	*foreground = CI_BLACK;
+	*background = CI_CYAN;
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::GetDefaultLineStyle(COLORINDEX* lineColor, LINESTYLE* lineIndex)
+{
+	// This shouldn't be called because we haven't requested MV_LINE or MV_BORDER.
+	*lineColor = CI_BLACK;
+	*lineIndex = LI_SOLID;
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::GetDefaultFontFlags(DWORD* fontFlags)
+{
+	*fontFlags = FF_DEFAULT;
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::DrawGlyphWithColors(HDC /*hdc*/, RECT* /*rect*/, long /*markerType*/, IVsTextMarkerColorSet* /*markerColors*/, DWORD /*glyphDrawFlags*/, long /*lineHeight*/)
+{
+	// This shouldn't be called because we haven't requested MV_GLYPH.
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::GetBehaviorFlags(DWORD* flags)
+{
+	*flags = MB_DEFAULT;
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::GetPriorityIndex(long* priorityIndex)
+{
+	*priorityIndex = 100;
+	return S_OK;
 }
