@@ -25,8 +25,8 @@ class ATL_NO_VTABLE CConnect :
 	public CComObjectRootEx<CComSingleThreadModel>,
 	public CComCoClass<CConnect, &CLSID_Connect>,
 	public IDispatchImpl<_IDTExtensibility2, &IID__IDTExtensibility2, &LIBID_AddInDesignerObjects, 1, 0>,
-	public IDispatchImpl<IVsTextManagerEvents, &__uuidof(IVsTextManagerEvents), &LIBID_TextManagerInternal>,
-	public IDispatchImpl<IVsTextViewEvents, &__uuidof(IVsTextViewEvents), &LIBID_TextManagerInternal>,
+	public IVsTextManagerEvents,
+	public IVsTextViewEvents,
 	public IServiceProvider,
 	public IVsTextMarkerTypeProvider,
 	public IVsPackageDefinedTextMarkerType
