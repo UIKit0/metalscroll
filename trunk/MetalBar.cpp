@@ -18,6 +18,8 @@
 #include "MetalBar.h"
 #include "OptionsDialog.h"
 #include "Intervals.h"
+#include "MarkerGUID.h"
+#include "EditCmdFilter.h"
 
 #define REFRESH_CODE_TIMER_ID		1
 #define REFRESH_CODE_INTERVAL		2000
@@ -65,16 +67,24 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 	m_scrollMax = 1;
 	m_dragging = false;
 
-	s_bars.insert(this);
+	m_editCmdFilter = CEditCmdFilter::AttachFilter(this);
 
+	s_bars.insert(this);
 	AdjustSize(s_barWidth);
 }
 
 MetalBar::~MetalBar()
 {
+	// Release the various COM things we used.
+	if(m_editCmdFilter)
+	{
+		m_editCmdFilter->RemoveFilter();
+		m_editCmdFilter->Release();
+	}
 	if(m_view)
 		m_view->Release();
 
+	// Free the paint stuff.
 	if(m_codeImg)
 		DeleteObject(m_codeImg);
 	if(m_backBufferImg)

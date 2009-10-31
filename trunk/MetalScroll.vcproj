@@ -253,6 +253,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\EditCmdFilter.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\Intervals.cpp"
 				>
 			</File>
@@ -303,7 +307,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\EditCmdFilter.h"
+				>
+			</File>
+			<File
 				RelativePath=".\Intervals.h"
+				>
+			</File>
+			<File
+				RelativePath=".\MarkerGUID.h"
 				>
 			</File>
 			<File
@@ -342,6 +354,10 @@
 			</File>
 			<File
 				RelativePath=".\AddIn.rgs"
+				>
+			</File>
+			<File
+				RelativePath=".\EditCmdFilter.rgs"
 				>
 			</File>
 			<File

@@ -17,6 +17,7 @@
 #pragma once
 
 class Intervals;
+class CEditCmdFilter;
 
 class MetalBar
 {
@@ -25,6 +26,7 @@ public:
 	~MetalBar();
 
 	IVsTextView*				GetView() const { return m_view; }
+	HWND						GetHwnd() const { return m_hwnd; }
 	LRESULT						WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
 	static void					ResetSettings();
@@ -68,6 +70,7 @@ private:
 	// Text.
 	IVsTextView*				m_view;
 	long						m_numLines;
+	CEditCmdFilter*				m_editCmdFilter;
 
 	// Painting.
 	bool						m_codeImgDirty;
