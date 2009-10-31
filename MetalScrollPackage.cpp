@@ -131,3 +131,39 @@ STDMETHODIMP CMetalScrollPackage::GetPriorityIndex(long* priorityIndex)
 	*priorityIndex = 100;
 	return S_OK;
 }
+
+STDMETHODIMP CMetalScrollPackage::GetCanonicalName(BSTR* nonLocalizeName)
+{
+	if(!nonLocalizeName)
+		return E_POINTER;
+
+	*nonLocalizeName = ::SysAllocString(L"MetalScroll");
+	return S_OK;
+}
+
+STDMETHODIMP CMetalScrollPackage::GetDisplayName(BSTR* displayName)
+{
+	if(!displayName)
+		return E_POINTER;
+
+	*displayName = ::SysAllocString(L"MetalScroll");
+	return S_OK;
+}
+
+STDMETHODIMP CMetalScrollPackage::GetMergingPriority(long* mergingPriority)
+{
+	if(!mergingPriority)
+		return E_POINTER;
+
+	*mergingPriority = 0x2000;
+	return S_OK;
+}
+
+STDMETHODIMP CMetalScrollPackage::GetDescription(BSTR* desc)
+{
+	if(!desc)
+		return E_POINTER;
+
+	*desc = ::SysAllocString(L"MetalScroll");
+	return S_OK;
+}

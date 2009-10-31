@@ -25,7 +25,8 @@ class ATL_NO_VTABLE CMetalScrollPackage :
 	public IVsPackage,
 	public IServiceProvider,
 	public IVsTextMarkerTypeProvider,
-	public IVsPackageDefinedTextMarkerType
+	public IVsPackageDefinedTextMarkerType,
+	public IVsMergeableUIItem
 {
 public:
 	CMetalScrollPackage()
@@ -39,6 +40,7 @@ public:
 		COM_INTERFACE_ENTRY(IServiceProvider)
 		COM_INTERFACE_ENTRY(IVsTextMarkerTypeProvider)
 		COM_INTERFACE_ENTRY(IVsPackageDefinedTextMarkerType)
+		COM_INTERFACE_ENTRY(IVsMergeableUIItem)
 	END_COM_MAP()
 
 	DECLARE_PROTECT_FINAL_CONSTRUCT()
@@ -75,6 +77,13 @@ public:
 	STDMETHOD(DrawGlyphWithColors)(HDC hdc, RECT* rect, long markerType, IVsTextMarkerColorSet* markerColors, DWORD glyphDrawFlags, long lineHeight);
 	STDMETHOD(GetBehaviorFlags)(DWORD* flags);
 	STDMETHOD(GetPriorityIndex)(long* priorityIndex);
+
+	// IVsMergeableUIItem implementation.
+	STDMETHOD(GetCanonicalName)(BSTR* nonLocalizeName);
+	STDMETHOD(GetDisplayName)(BSTR* displayName);
+	STDMETHOD(GetMergingPriority)(long* mergingPriority);
+	STDMETHOD(GetDescription)(BSTR* desc);
+
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(MetalScrollPackage), CMetalScrollPackage)
