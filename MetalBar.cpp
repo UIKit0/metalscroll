@@ -518,6 +518,7 @@ void MetalBar::GetLineFlags(LineList& lines, IVsTextLines* buffer)
 
 void MetalBar::PaintLineFlags(unsigned int* line, unsigned int flags)
 {
+	// Left margin flags.
 	if( (flags & LineMarker_ChangedUnsaved) || (flags & LineMarker_ChangedSaved) )
 	{
 		// We can get both flags on the same line because we don't mark individual lines, but take surrounding lines
@@ -526,13 +527,19 @@ void MetalBar::PaintLineFlags(unsigned int* line, unsigned int flags)
 		line[0] = line[1] = line[2] = color;
 	}
 
-	if( (flags & LineMarker_Bookmark) || (flags & LineMarker_Breakpoint) )
-	{
-		// The breakpoint marker takes precedence in case both are present.
-		unsigned int color = (flags & LineMarker_Breakpoint) ? s_breakpointColor : s_bookmarkColor;
-		for(int i = 59; i < 64; ++i)
-			line[i] = color;
-	}
+	// Right margin flags.
+	unsigned int color;
+	if(flags & LineMarker_Match)
+		color = s_matchColor;
+	else if(flags & LineMarker_Breakpoint)
+		color = s_breakpointColor;
+	else if(flags & LineMarker_Bookmark)
+		color = s_bookmarkColor;
+	else
+		return;
+
+	for(int i = 59; i < 64; ++i)
+		line[i] = color;
 }
 
 bool MetalBar::GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines)
@@ -558,7 +565,7 @@ void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightLis
 {
 	struct AddHighlightOp : public MarkerOperator
 	{
-		AddHighlightOp(LineList& lines_, HighlightList& storage_) : lines(lines_), storage(storage_) {}
+		AddHighlightOp(MetalBar* bar_, LineList& lines_, HighlightList& storage_) : bar(bar_), lines(lines_), storage(storage_) {}
 
 		void NotifyCount(int numMarkers) const { storage.resize(numMarkers); }
 
@@ -572,6 +579,10 @@ void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightLis
 			Highlight* newh = &storage[idx];
 			newh->start = span.iStartIndex;
 			newh->end = span.iEndIndex;
+
+			// Add a marker on the right to make it easier to see.
+			if(!line.highlights)
+				bar->MarkLineRange(lines, LineMarker_Match, span.iStartLine, span.iStartLine);
 
 			// Preserve ordering.
 			Highlight* h = line.highlights;
@@ -589,24 +600,12 @@ void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightLis
 			h->next = newh;
 		}
 
+		MetalBar* bar;
 		LineList& lines;
 		HighlightList& storage;
 	};
 
-	ProcessLineMarkers(buffer, g_highlightMarkerType, AddHighlightOp(lines, storage));
-}
-
-void MetalBar::PaintHighlights(unsigned int* line, const Highlight* highlights)
-{
-	for(const Highlight* h = highlights; h; h = h->next)
-	{
-		for(int i = h->start; i <= h->end; ++i)
-		{
-			if(i >= (int)s_barWidth)
-				break;
-			line[i] = s_matchColor;
-		}
-	}
+	ProcessLineMarkers(buffer, g_highlightMarkerType, AddHighlightOp(this, lines, storage));
 }
 
 #define ADVANCE_LINE()													\
@@ -616,10 +615,9 @@ void MetalBar::PaintHighlights(unsigned int* line, const Highlight* highlights)
 			pixel[i] = s_whitespaceColor;								\
 																		\
 		PaintLineFlags(pixel, lines[currentTextLine].flags);			\
-		PaintHighlights(pixel, lines[currentTextLine].highlights);		\
 	}																	\
-	++currentTextLine
-
+	++currentTextLine;													\
+	currentTextColumn = 0
 
 void MetalBar::RenderCodeImg()
 {
@@ -671,6 +669,8 @@ void MetalBar::RenderCodeImg()
 	
 	int realNumLines = 0;
 	int currentTextLine = 0;
+	unsigned int currentTextColumn = 0;
+	Highlight* crHighlight = lines[0].highlights;
 	for(wchar_t* chr = text; *chr; ++chr)
 	{
 		// Check for newline.
@@ -681,6 +681,8 @@ void MetalBar::RenderCodeImg()
 				++chr;
 
 			ADVANCE_LINE();
+
+			crHighlight = lines[currentTextLine].highlights;
 
 			if(!(lines[currentTextLine].flags & LineMarker_Hidden))
 			{
@@ -739,12 +741,26 @@ void MetalBar::RenderCodeImg()
 					}
 					break;
 			}
+
+			// Advance the highlight interval, if needed.
+			while(crHighlight && (currentTextColumn > crHighlight->end))
+				crHighlight = crHighlight->next;
+
+			// Override the color with the match color if inside a marker.
+			if(crHighlight && (currentTextColumn >= crHighlight->start))
+				color = s_matchColor;
+
+			// Advance the current column by the correct number of characters.
+			currentTextColumn += numChars;
 		}
 		else
 		{
 			color = s_whitespaceColor;
 			if(*chr == L'\t')
 				numChars = (int)tabSize;
+
+			// Tabs count as a single character for the column tracking.
+			++currentTextColumn;
 		}
 
 		for(int i = 0; i < numChars; ++i)
@@ -877,7 +893,7 @@ void MetalBar::ResetSettings()
 	s_characterColor = 0xff808080;
 	s_commentColor = 0xff008000;
 	s_cursorColor = 0xe0000028;
-	s_matchColor = 0xffd7f600;
+	s_matchColor = 0xffff8000;
 	s_modifiedLineColor = 0xff0000ff;
 	s_unsavedLineColor = 0xffe1621e;
 	s_breakpointColor = 0xffff0000;
