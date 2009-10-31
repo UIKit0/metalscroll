@@ -51,13 +51,27 @@ STDMETHODIMP CEditCmdFilter::Exec(const GUID* cmdGroup, DWORD cmdID, DWORD cmdex
 {
 	assert(m_bar);
 
-	// If the user double-clicked in the editor with ALT held down, send a message to the scrollbar, so that
-	// it applies a marker on all occurrences of the selected word and highlights it in the code image.
-	if(InlineIsEqualGUID(*cmdGroup, g_stdCmdGUID) && (cmdID == ECMD_DOUBLECLICK) )
+	if(InlineIsEqualGUID(*cmdGroup, g_stdCmdGUID))
 	{
-		DWORD state = GetAsyncKeyState(VK_MENU);
-		if(state & 80000000)
-			PostMessage(m_bar->GetHwnd(), (WM_USER + 1), 0, 0);
+		switch(cmdID)
+		{
+			case ECMD_DOUBLECLICK:
+			{
+				// If the user double-clicked in the editor with ALT held down, send a message to the scrollbar, so that
+				// it applies a marker on all occurrences of the selected word and highlights it in the code image.
+				DWORD state = GetAsyncKeyState(VK_MENU);
+				if(state & 80000000)
+					PostMessage(m_bar->GetHwnd(), (WM_USER + 1), 0, 0);
+				break;
+			}
+
+			case ECMD_CANCEL:
+			{
+				// Remove the markers set by ALT-doubleclick.
+				PostMessage(m_bar->GetHwnd(), (WM_USER + 2), 0, 0);
+				break;
+			}
+		}
 	}
 
 	if(m_nextHandler)
