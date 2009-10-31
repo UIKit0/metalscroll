@@ -89,8 +89,11 @@ private:
 	int							m_scrollMax;
 	bool						m_dragging;
 
+	bool						GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
 	void						OnDrag(bool initial);
 	void						OnPaint(HDC ctrlDC);
+	void						HighlightMatchingWords();
+	void						RemoveWordHightlight();
 	void						AdjustSize(unsigned int requiredWidth);
 	void						GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn);
 	void						MarkLineRange(std::vector<unsigned char>& markers, unsigned char flag, int start, int end);

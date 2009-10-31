@@ -296,6 +296,27 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			InvalidateRect(hwnd, 0, 0);
 			return 0;
 		}
+
+		case (WM_USER + 1):
+		{
+			// This message is sent by the command filter to inform us we should highlight words matching
+			// the current selection.
+			HighlightMatchingWords();
+			m_codeImgDirty = true;
+			InvalidateRect(hwnd, 0, 0);
+			return 0;
+		}
+
+		case WM_RBUTTONUP:
+		case (WM_USER + 2):
+		{
+			// Right-clicking on the bar or pressing ESC removes the matching word markers. ESC key presses
+			// are sent to us by the command filter as WM_USER+2 messages.
+			RemoveWordHightlight();
+			m_codeImgDirty = true;
+			InvalidateRect(hwnd, 0, 0);
+			return 0;
+		}
 	}
 
 	return CallWindowProc(oldProc, hwnd, message, wparam, lparam);
@@ -492,11 +513,30 @@ void MetalBar::PaintMarkers(unsigned int* line, unsigned char flags)
 	}
 }
 
+bool MetalBar::GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines)
+{
+	HRESULT hr = m_view->GetBuffer(buffer);
+	if(FAILED(hr) || !*buffer)
+		return false;
+
+	hr = (*buffer)->GetLineCount(numLines);
+	if(FAILED(hr))
+		return false;
+
+	long numCharsLastLine;
+	hr = (*buffer)->GetLengthOfLine(*numLines - 1, &numCharsLastLine);
+	if(FAILED(hr))
+		return false;
+
+	hr = (*buffer)->GetLineText(0, 0, *numLines - 1, numCharsLastLine, text);
+	return SUCCEEDED(hr) && (*text);
+}
+
 void MetalBar::RenderCodeImg()
 {
 	CComPtr<IVsTextLines> lines;
-	HRESULT hr = m_view->GetBuffer(&lines);
-	if(FAILED(hr) || !lines)
+	CComBSTR text;
+	if(!GetBufferAndText(&lines, &text, &m_numLines))
 		return;
 
 	unsigned int tabSize;
@@ -506,25 +546,11 @@ void MetalBar::RenderCodeImg()
 	else
 		tabSize = 4;
 
-	hr = lines->GetLineCount(&m_numLines);
-	if(FAILED(hr))
-		return;
-
 	Intervals hiddenRgn;
 	GetHiddenLines(lines, hiddenRgn);
 
 	std::vector<unsigned char> markers;
 	GetMarkers(markers, lines);
-
-	long numCharsLastLine;
-	hr = lines->GetLengthOfLine(m_numLines - 1, &numCharsLastLine);
-	if(FAILED(hr))
-		return;
-
-	CComBSTR text;
-	hr = lines->GetLineText(0, 0, m_numLines - 1, numCharsLastLine, &text);
-	if(FAILED(hr) || !text)
-		return;
 
 	if(m_numLines < 1)
 		m_numLines = 1;
@@ -855,5 +881,87 @@ void MetalBar::SaveSettings()
 		bar->m_codeImgDirty = true;
 		bar->AdjustSize(s_barWidth);
 		InvalidateRect(bar->m_hwnd, 0, 0);
+	}
+}
+
+void MetalBar::RemoveWordHightlight()
+{
+	CComPtr<IVsTextLines> buffer;
+	HRESULT hr = m_view->GetBuffer(&buffer);
+	if(FAILED(hr) || !buffer)
+		return;
+
+	long numLines;
+	hr = buffer->GetLineCount(&numLines);
+	if(FAILED(hr))
+		return;
+
+	long markerType;
+	hr = g_textMgr->GetRegisteredMarkerTypeID(&g_markerTypeGUID, &markerType);
+	if(FAILED(hr))
+		return;
+
+	CComPtr<IVsEnumLineMarkers> enumMarkers;
+	hr = buffer->EnumMarkers(0, 0, numLines, 0, markerType, 0, &enumMarkers);
+	if(FAILED(hr) || !enumMarkers)
+		return;
+
+	long numMarkers;
+	hr = enumMarkers->GetCount(&numMarkers);
+	if(FAILED(hr))
+		return;
+
+	for(int m = 0; m < numMarkers; ++m)
+	{
+		CComPtr<IVsTextLineMarker> marker;
+		hr = enumMarkers->Next(&marker);
+		if(FAILED(hr))
+			break;
+
+		marker->Invalidate();
+	}
+}
+
+void MetalBar::HighlightMatchingWords()
+{
+	RemoveWordHightlight();
+
+	CComPtr<IVsTextLines> buffer;
+	CComBSTR allText;
+	long numLines;
+	if(!GetBufferAndText(&buffer, &allText, &numLines))
+		return;
+
+	CComBSTR selText;
+	HRESULT hr = m_view->GetSelectedText(&selText);
+	if(FAILED(hr) || !selText)
+		return;
+
+	unsigned int selTextLen = selText.Length();
+
+	long markerType;
+	hr = g_textMgr->GetRegisteredMarkerTypeID(&g_markerTypeGUID, &markerType);
+	if(FAILED(hr))
+		return;
+
+	int line = 0;
+	int column = 0;
+	for(wchar_t* chr = allText; *chr; ++chr)
+	{
+		// Check for newline.
+		if( (chr[0] == L'\r') || (chr[0] == L'\n') )
+		{
+			// In case of CRLF, eat the next character.
+			if( (chr[0] == L'\r') && (chr[1] == L'\n') )
+				++chr;
+			++line;
+			column = 0;
+			continue;
+		}
+
+		if(wcsncmp(chr, selText, selTextLen) == 0)
+			buffer->CreateLineMarker(markerType, line, column, line, column + selTextLen, 0, 0);
+
+		++column;
 	}
 }
