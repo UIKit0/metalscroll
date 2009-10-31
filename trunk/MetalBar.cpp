@@ -17,7 +17,6 @@
 #include "MetalScrollPCH.h"
 #include "MetalBar.h"
 #include "OptionsDialog.h"
-#include "MarkerGUID.h"
 #include "EditCmdFilter.h"
 
 #define REFRESH_CODE_TIMER_ID		1
@@ -25,6 +24,7 @@
 
 extern CComPtr<EnvDTE80::DTE2>		g_dte;
 extern CComPtr<IVsTextManager>		g_textMgr;
+extern long							g_highlightMarkerType;
 
 unsigned int MetalBar::s_barWidth;
 unsigned int MetalBar::s_whitespaceColor;
@@ -311,9 +311,14 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		{
 			// Right-clicking on the bar or pressing ESC removes the matching word markers. ESC key presses
 			// are sent to us by the command filter as WM_USER+2 messages.
-			RemoveWordHightlight();
-			m_codeImgDirty = true;
-			InvalidateRect(hwnd, 0, 0);
+			CComPtr<IVsTextLines> buffer;
+			HRESULT hr = m_view->GetBuffer(&buffer);
+			if(SUCCEEDED(hr) && buffer)
+			{
+				RemoveWordHighlight(buffer);
+				m_codeImgDirty = true;
+				InvalidateRect(hwnd, 0, 0);
+			}
 			return 0;
 		}
 	}
@@ -321,7 +326,7 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 	return CallWindowProc(oldProc, hwnd, message, wparam, lparam);
 }
 
-void MetalBar::GetHiddenLines(std::vector<unsigned char>& markers, IVsTextLines* buffer)
+void MetalBar::FindHiddenLines(LineList& lines, IVsTextLines* buffer)
 {
 	CComQIPtr<IServiceProvider> sp = g_dte;
 	if(!sp)
@@ -353,14 +358,14 @@ void MetalBar::GetHiddenLines(std::vector<unsigned char>& markers, IVsTextLines*
 			TextSpan span;
 			region->GetSpan(&span);
 			for(int l = span.iStartLine + 1; l <= span.iEndLine; ++l)
-				markers[l] |= LineMarker_Hidden;
+				lines[l].flags |= LineMarker_Hidden;
 		}
 
 		region->Release();
 	}
 }
 
-void MetalBar::MarkLineRange(std::vector<unsigned char>& markers, unsigned char flag, int start, int end)
+void MetalBar::MarkLineRange(LineList& lines, unsigned int flag, int start, int end)
 {
 	// Mark the surrounding lines too, because single-pixel margins are impossible to see.
 	int extraLines;
@@ -372,13 +377,18 @@ void MetalBar::MarkLineRange(std::vector<unsigned char>& markers, unsigned char 
 	start = std::max(start - extraLines, 0);
 	end = std::min(end + extraLines, (int)m_numLines - 1);
 	for(int i = start; i <= end; ++i)
-		markers[i] |= flag;
+		lines[i].flags |= flag;
 }
 
-void MetalBar::FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int type, unsigned char flag)
+void MetalBar::ProcessLineMarkers(IVsTextLines* buffer, int type, const MarkerOperator& op)
 {
+	long numLines;
+	HRESULT hr = buffer->GetLineCount(&numLines);
+	if(FAILED(hr))
+		return;
+
 	CComPtr<IVsEnumLineMarkers> enumMarkers;
-	HRESULT hr = buffer->EnumMarkers(0, 0, m_numLines, 0, type, 0, &enumMarkers);
+	hr = buffer->EnumMarkers(0, 0, numLines, 0, type, 0, &enumMarkers);
 	if(FAILED(hr) || !enumMarkers)
 		return;
 
@@ -387,19 +397,16 @@ void MetalBar::FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* bu
 	if(FAILED(hr))
 		return;
 
-	for(int m = 0; m < numMarkers; ++m)
+	op.NotifyCount(numMarkers);
+
+	for(int idx = 0; idx < numMarkers; ++idx)
 	{
 		CComPtr<IVsTextLineMarker> marker;
 		hr = enumMarkers->Next(&marker);
 		if(FAILED(hr))
 			break;
 
-		TextSpan span;
-		hr = marker->GetCurrentSpan(&span);
-		if(FAILED(hr))
-			continue;
-
-		MarkLineRange(markers, flag, span.iStartLine, span.iEndLine);
+		op.Process(marker, idx);
 	}
 }
 
@@ -429,7 +436,7 @@ bool MetalBar::GetFileName(CComBSTR& name, IVsTextLines* buffer)
 	return SUCCEEDED(hr) && name;
 }
 
-void MetalBar::FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines* buffer)
+void MetalBar::FindBreakpoints(LineList& lines, IVsTextLines* buffer)
 {
 	CComBSTR fileName;
 	if(!GetFileName(fileName, buffer))
@@ -475,28 +482,41 @@ void MetalBar::FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines
 		if(FAILED(hr))
 			continue;
 
-		MarkLineRange(markers, LineMarker_Breakpoint, line, line);
+		MarkLineRange(lines, LineMarker_Breakpoint, line, line);
 	}
 }
 
-void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer)
+void MetalBar::GetLineFlags(LineList& lines, IVsTextLines* buffer)
 {
-	markers.resize(m_numLines, 0);
+	FindHiddenLines(lines, buffer);
+
+	struct MarkRangeOp : public MarkerOperator
+	{
+		MarkRangeOp(MetalBar* bar_, LineList& lines_, unsigned int flag_) : bar(bar_), lines(lines_), flag(flag_) {}
+
+		void Process(IVsTextLineMarker* marker, int /*idx*/) const
+		{
+			TextSpan span;
+			marker->GetCurrentSpan(&span);
+			bar->MarkLineRange(lines, flag, span.iStartLine, span.iEndLine);
+		}
+
+		MetalBar* bar;
+		LineList& lines;
+		unsigned int flag;
+	};
 
 	// The magic IDs for the changed lines are not in the MARKERTYPE enum, because they are useful and
 	// we wouldn't want people to have access to useful stuff. I found them by disassembling RockScroll.
-	FindMarkers(markers, buffer, 0x13, LineMarker_ChangedUnsaved);
-	FindMarkers(markers, buffer, 0x14, LineMarker_ChangedSaved);
-	FindMarkers(markers, buffer, MARKER_BOOKMARK, LineMarker_Bookmark);
+	ProcessLineMarkers(buffer, 0x13, MarkRangeOp(this, lines, LineMarker_ChangedUnsaved));
+	ProcessLineMarkers(buffer, 0x14, MarkRangeOp(this, lines, LineMarker_ChangedSaved));
+	ProcessLineMarkers(buffer, MARKER_BOOKMARK, MarkRangeOp(this, lines, LineMarker_Bookmark));
 
 	// Breakpoints must be retrieved in a different way.
-	FindBreakpoints(markers, buffer);
-
-	// We'll store hidden lines here too.
-	GetHiddenLines(markers, buffer);
+	FindBreakpoints(lines, buffer);
 }
 
-void MetalBar::PaintMarkers(unsigned int* line, unsigned char flags)
+void MetalBar::PaintLineFlags(unsigned int* line, unsigned int flags)
 {
 	if( (flags & LineMarker_ChangedUnsaved) || (flags & LineMarker_ChangedSaved) )
 	{
@@ -534,25 +554,95 @@ bool MetalBar::GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLine
 	return SUCCEEDED(hr) && (*text);
 }
 
+void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightList& storage)
+{
+	struct AddHighlightOp : public MarkerOperator
+	{
+		AddHighlightOp(LineList& lines_, HighlightList& storage_) : lines(lines_), storage(storage_) {}
+
+		void NotifyCount(int numMarkers) const { storage.resize(numMarkers); }
+
+		void Process(IVsTextLineMarker* marker, int idx) const
+		{
+			TextSpan span;
+			marker->GetCurrentSpan(&span);
+			assert(span.iStartLine == span.iEndLine);
+
+			LineInfo& line = lines[span.iStartLine];
+			Highlight* newh = &storage[idx];
+			newh->start = span.iStartIndex;
+			newh->end = span.iEndIndex;
+
+			// Preserve ordering.
+			Highlight* h = line.highlights;
+			if(!h || (h->start > newh->start))
+			{
+				newh->next = h;
+				line.highlights = newh;
+				return;
+			}
+
+			while(h->next && (newh->start > h->next->start))
+				h = h->next;
+
+			newh->next = h->next;
+			h->next = newh;
+		}
+
+		LineList& lines;
+		HighlightList& storage;
+	};
+
+	ProcessLineMarkers(buffer, g_highlightMarkerType, AddHighlightOp(lines, storage));
+}
+
+void MetalBar::PaintHighlights(unsigned int* line, const Highlight* highlights)
+{
+	for(const Highlight* h = highlights; h; h = h->next)
+	{
+		for(int i = h->start; i <= h->end; ++i)
+		{
+			if(i >= (int)s_barWidth)
+				break;
+			line[i] = s_matchColor;
+		}
+	}
+}
+
+#define ADVANCE_LINE()													\
+	if(!(lines[currentTextLine].flags & LineMarker_Hidden))				\
+	{																	\
+		for(unsigned int i = linePos; i < s_barWidth; ++i)				\
+			pixel[i] = s_whitespaceColor;								\
+																		\
+		PaintLineFlags(pixel, lines[currentTextLine].flags);			\
+		PaintHighlights(pixel, lines[currentTextLine].highlights);		\
+	}																	\
+	++currentTextLine
+
+
 void MetalBar::RenderCodeImg()
 {
-	CComPtr<IVsTextLines> lines;
+	CComPtr<IVsTextLines> buffer;
 	CComBSTR text;
-	if(!GetBufferAndText(&lines, &text, &m_numLines))
+	if(!GetBufferAndText(&buffer, &text, &m_numLines))
 		return;
 
 	unsigned int tabSize;
 	LANGPREFERENCES langPrefs;
-	if( SUCCEEDED(lines->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
+	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
 		tabSize = langPrefs.uTabSize;
 	else
 		tabSize = 4;
 
-	std::vector<unsigned char> markers;
-	GetMarkers(markers, lines);
-
 	if(m_numLines < 1)
 		m_numLines = 1;
+
+	LineInfo defaultLineInfo = { 0 };
+	LineList lines(m_numLines, defaultLineInfo);
+	GetLineFlags(lines, buffer);
+	HighlightList highlightStorage;
+	GetHighlights(lines, buffer, highlightStorage);
 
 	if(m_codeImg)
 		DeleteObject(m_codeImg);
@@ -590,16 +680,9 @@ void MetalBar::RenderCodeImg()
 			if( (chr[0] == L'\r') && (chr[1] == L'\n') )
 				++chr;
 
-			// Fill the rest of the line with white.
-			for(unsigned int i = linePos; i < s_barWidth; ++i)
-				pixel[i] = s_whitespaceColor;
+			ADVANCE_LINE();
 
-			// Paint the markers even if the line is hidden. This way, markers inside hidden regions are painted
-			// on the line where the region label (ellipsis) is displayed.
-			PaintMarkers(pixel, markers[currentTextLine]);
-
-			++currentTextLine;
-			if(!(markers[currentTextLine] & LineMarker_Hidden))
+			if(!(lines[currentTextLine].flags & LineMarker_Hidden))
 			{
 				// Advance the image pointer.
 				linePos = 0;
@@ -675,9 +758,8 @@ void MetalBar::RenderCodeImg()
 		}
 	}
 
-	// Fill the remaining pixels of the first line.
-	for(; linePos < s_barWidth; ++linePos)
-		pixel[linePos] = s_whitespaceColor;
+	ADVANCE_LINE();
+	assert(currentTextLine == m_numLines);
 
 	m_numLines = realNumLines + 1;
 
@@ -879,53 +961,28 @@ void MetalBar::SaveSettings()
 	}
 }
 
-void MetalBar::RemoveWordHightlight()
+void MetalBar::RemoveWordHighlight(IVsTextLines* buffer)
 {
-	CComPtr<IVsTextLines> buffer;
-	HRESULT hr = m_view->GetBuffer(&buffer);
-	if(FAILED(hr) || !buffer)
-		return;
-
-	long numLines;
-	hr = buffer->GetLineCount(&numLines);
-	if(FAILED(hr))
-		return;
-
-	long markerType;
-	hr = g_textMgr->GetRegisteredMarkerTypeID(&g_markerTypeGUID, &markerType);
-	if(FAILED(hr))
-		return;
-
-	CComPtr<IVsEnumLineMarkers> enumMarkers;
-	hr = buffer->EnumMarkers(0, 0, numLines, 0, markerType, 0, &enumMarkers);
-	if(FAILED(hr) || !enumMarkers)
-		return;
-
-	long numMarkers;
-	hr = enumMarkers->GetCount(&numMarkers);
-	if(FAILED(hr))
-		return;
-
-	for(int m = 0; m < numMarkers; ++m)
+	struct DeleteMarkerOp : public MarkerOperator
 	{
-		CComPtr<IVsTextLineMarker> marker;
-		hr = enumMarkers->Next(&marker);
-		if(FAILED(hr))
-			break;
+		void Process(IVsTextLineMarker* marker, int /*idx*/) const
+		{
+			marker->Invalidate();
+		}
+	};
 
-		marker->Invalidate();
-	}
+	ProcessLineMarkers(buffer, g_highlightMarkerType, DeleteMarkerOp());
 }
 
 void MetalBar::HighlightMatchingWords()
 {
-	RemoveWordHightlight();
-
 	CComPtr<IVsTextLines> buffer;
 	CComBSTR allText;
 	long numLines;
 	if(!GetBufferAndText(&buffer, &allText, &numLines))
 		return;
+
+	RemoveWordHighlight(buffer);
 
 	CComBSTR selText;
 	HRESULT hr = m_view->GetSelectedText(&selText);
@@ -933,11 +990,6 @@ void MetalBar::HighlightMatchingWords()
 		return;
 
 	unsigned int selTextLen = selText.Length();
-
-	long markerType;
-	hr = g_textMgr->GetRegisteredMarkerTypeID(&g_markerTypeGUID, &markerType);
-	if(FAILED(hr))
-		return;
 
 	int line = 0;
 	int column = 0;
@@ -955,7 +1007,12 @@ void MetalBar::HighlightMatchingWords()
 		}
 
 		if(wcsncmp(chr, selText, selTextLen) == 0)
-			buffer->CreateLineMarker(markerType, line, column, line, column + selTextLen, 0, 0);
+		{
+			buffer->CreateLineMarker(g_highlightMarkerType, line, column, line, column + selTextLen, 0, 0);
+			// Make sure we don't create overlapping markers.
+			chr += selTextLen - 1;
+			column += selTextLen - 1;
+		}
 
 		++column;
 	}

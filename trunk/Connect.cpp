@@ -18,12 +18,14 @@
 #include "Connect.h"
 #include "MetalBar.h"
 #include "ColorChip.h"
+#include "MarkerGUID.h"
 
 extern CAddInModule _AtlModule;
 
 CComPtr<EnvDTE80::DTE2>				g_dte;
 CComPtr<EnvDTE::AddIn>				g_addInInstance;
 CComPtr<IVsTextManager>				g_textMgr;
+long								g_highlightMarkerType;
 
 CConnect::CConnect()
 {
@@ -75,6 +77,10 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 	hr = connPt->Advise((IVsTextManagerEvents*)this, &m_textMgrEventsCookie);
 	if(FAILED(hr))
 		return hr;
+
+	hr = g_textMgr->GetRegisteredMarkerTypeID(&g_markerTypeGUID, &g_highlightMarkerType);
+	if(FAILED(hr))
+		g_highlightMarkerType = 0;
 
 	MetalBar::ReadSettings();
 	ColorChip::Register();
