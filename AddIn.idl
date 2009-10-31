@@ -44,4 +44,12 @@ library MetalScrollLib
 	{
 		[default] interface IVsPackage;
 	};
+	[
+		uuid(DB618CA2-6EEC-4ABB-98E2-61E2574F3E78),
+		helpstring("EditCmdFilter Class")
+	]
+	coclass EditCmdFilter
+	{
+		[default] interface IOleCommandTarget;
+	};
 };

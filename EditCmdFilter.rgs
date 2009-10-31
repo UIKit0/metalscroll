@@ -1,0 +1,25 @@
+HKCR
+{
+	MetalScroll.EditCmdFilter.1 = s 'EditCmdFilter Class'
+	{
+		CLSID = s '{DB618CA2-6EEC-4ABB-98E2-61E2574F3E78}'
+	}
+	MetalScroll.EditCmdFilter = s 'EditCmdFilter Class'
+	{
+		CLSID = s '{DB618CA2-6EEC-4ABB-98E2-61E2574F3E78}'
+		CurVer = s 'MetalScroll.EditCmdFilter.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {DB618CA2-6EEC-4ABB-98E2-61E2574F3E78} = s 'EditCmdFilter Class'
+		{
+			ProgID = s 'MetalScroll.EditCmdFilter.1'
+			VersionIndependentProgID = s 'MetalScroll.EditCmdFilter'
+			ForceRemove 'Programmable'
+			InprocServer32 = s '%MODULE%'
+			{
+			}
+			'TypeLib' = s '{694BCCDA-B2B0-4A97-BB4B-E7B128B05D76}'
+		}
+	}
+}

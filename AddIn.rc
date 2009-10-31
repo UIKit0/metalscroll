@@ -102,6 +102,7 @@ END
 
 IDR_ADDIN               REGISTRY                "AddIn.rgs"
 IDR_METALSCROLLPACKAGE  REGISTRY                "MetalScrollPackage.rgs"
+IDR_EDITCMDFILTER       REGISTRY                "EditCmdFilter.rgs"
 
 /////////////////////////////////////////////////////////////////////////////
 //
