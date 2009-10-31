@@ -17,7 +17,6 @@
 #include "MetalScrollPCH.h"
 #include "MetalBar.h"
 #include "OptionsDialog.h"
-#include "Intervals.h"
 #include "MarkerGUID.h"
 #include "EditCmdFilter.h"
 
@@ -322,7 +321,7 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 	return CallWindowProc(oldProc, hwnd, message, wparam, lparam);
 }
 
-void MetalBar::GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn)
+void MetalBar::GetHiddenLines(std::vector<unsigned char>& markers, IVsTextLines* buffer)
 {
 	CComQIPtr<IServiceProvider> sp = g_dte;
 	if(!sp)
@@ -353,8 +352,8 @@ void MetalBar::GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn)
 		{
 			TextSpan span;
 			region->GetSpan(&span);
-			if(span.iStartLine + 1 < span.iEndLine)
-				hiddenRgn.Add(span.iStartLine + 1, span.iEndLine);
+			for(int l = span.iStartLine + 1; l <= span.iEndLine; ++l)
+				markers[l] |= LineMarker_Hidden;
 		}
 
 		region->Release();
@@ -492,6 +491,9 @@ void MetalBar::GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buf
 
 	// Breakpoints must be retrieved in a different way.
 	FindBreakpoints(markers, buffer);
+
+	// We'll store hidden lines here too.
+	GetHiddenLines(markers, buffer);
 }
 
 void MetalBar::PaintMarkers(unsigned int* line, unsigned char flags)
@@ -546,9 +548,6 @@ void MetalBar::RenderCodeImg()
 	else
 		tabSize = 4;
 
-	Intervals hiddenRgn;
-	GetHiddenLines(lines, hiddenRgn);
-
 	std::vector<unsigned char> markers;
 	GetMarkers(markers, lines);
 
@@ -580,8 +579,6 @@ void MetalBar::RenderCodeImg()
 		CommentType_MultiLine
 	} commentType = CommentType_None;
 	
-	hiddenRgn.BeginScan();
-
 	int realNumLines = 0;
 	int currentTextLine = 0;
 	for(wchar_t* chr = text; *chr; ++chr)
@@ -601,10 +598,8 @@ void MetalBar::RenderCodeImg()
 			// on the line where the region label (ellipsis) is displayed.
 			PaintMarkers(pixel, markers[currentTextLine]);
 
-			hiddenRgn.NextValue();
 			++currentTextLine;
-
-			if(!hiddenRgn.IsCurrentValueInside())
+			if(!(markers[currentTextLine] & LineMarker_Hidden))
 			{
 				// Advance the image pointer.
 				linePos = 0;

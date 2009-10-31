@@ -16,7 +16,6 @@
 
 #pragma once
 
-class Intervals;
 class CEditCmdFilter;
 
 class MetalBar
@@ -51,10 +50,11 @@ public:
 private:
 	enum LineMarker
 	{
-		LineMarker_ChangedUnsaved = 0x01,
-		LineMarker_ChangedSaved = 0x02,
-		LineMarker_Breakpoint = 0x04,
-		LineMarker_Bookmark = 0x08
+		LineMarker_Hidden			= 0x01,
+		LineMarker_ChangedUnsaved	= 0x02,
+		LineMarker_ChangedSaved		= 0x04,
+		LineMarker_Breakpoint		= 0x08,
+		LineMarker_Bookmark			= 0x10
 	};
 
 	static std::set<MetalBar*>	s_bars;
@@ -95,9 +95,9 @@ private:
 	void						HighlightMatchingWords();
 	void						RemoveWordHightlight();
 	void						AdjustSize(unsigned int requiredWidth);
-	void						GetHiddenLines(IVsTextLines* buffer, Intervals& hiddenRgn);
 	void						MarkLineRange(std::vector<unsigned char>& markers, unsigned char flag, int start, int end);
 	void						FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int type, unsigned char flag);
+	void						GetHiddenLines(std::vector<unsigned char>& markers, IVsTextLines* buffer);
 	bool						GetFileName(CComBSTR& name, IVsTextLines* buffer);
 	void						FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines* buffer);
 	void						GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer);
