@@ -24,28 +24,28 @@ public:
 	MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IVsTextView* view);
 	~MetalBar();
 
-	IVsTextView*				GetView() const { return m_view; }
-	HWND						GetHwnd() const { return m_hwnd; }
-	LRESULT						WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	IVsTextView*					GetView() const { return m_view; }
+	HWND							GetHwnd() const { return m_hwnd; }
+	LRESULT							WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
-	static void					ResetSettings();
-	static void					ReadSettings();
-	static void					SaveSettings();
+	static void						ResetSettings();
+	static void						ReadSettings();
+	static void						SaveSettings();
 
-	static void					RemoveAllBars();
+	static void						RemoveAllBars();
 
 	// User-controllable parameters.
-	static unsigned int			s_barWidth;
-	static unsigned int			s_whitespaceColor;
-	static unsigned int			s_upperCaseColor;
-	static unsigned int			s_characterColor;
-	static unsigned int			s_commentColor;
-	static unsigned int			s_cursorColor;
-	static unsigned int			s_matchColor;
-	static unsigned int			s_modifiedLineColor;
-	static unsigned int			s_unsavedLineColor;
-	static unsigned int			s_breakpointColor;
-	static unsigned int			s_bookmarkColor;
+	static unsigned int				s_barWidth;
+	static unsigned int				s_whitespaceColor;
+	static unsigned int				s_upperCaseColor;
+	static unsigned int				s_characterColor;
+	static unsigned int				s_commentColor;
+	static unsigned int				s_cursorColor;
+	static unsigned int				s_matchColor;
+	static unsigned int				s_modifiedLineColor;
+	static unsigned int				s_unsavedLineColor;
+	static unsigned int				s_breakpointColor;
+	static unsigned int				s_bookmarkColor;
 
 private:
 	enum LineMarker
@@ -57,51 +57,78 @@ private:
 		LineMarker_Bookmark			= 0x10
 	};
 
-	static std::set<MetalBar*>	s_bars;
-	static bool					ReadRegInt(unsigned int* to, HKEY key, const char* name);
-	static void					WriteRegInt(HKEY key, const char* name, unsigned int val);
+	struct Highlight
+	{
+		int							start;
+		int							end;
+		Highlight*					next;
+	};
+
+	struct LineInfo
+	{
+		unsigned int				flags;
+		Highlight*					highlights;
+	};
+
+	typedef std::vector<LineInfo>	LineList;
+	typedef std::vector<Highlight>	HighlightList;
+
+	struct MarkerOperator
+	{
+		virtual void NotifyCount(int /*numMarkers*/) const {}
+		virtual void Process(IVsTextLineMarker* marker, int idx) const = 0;
+	};
+
+	static std::set<MetalBar*>		s_bars;
+	static bool						ReadRegInt(unsigned int* to, HKEY key, const char* name);
+	static void						WriteRegInt(HKEY key, const char* name, unsigned int val);
 
 	// Handles and other window-related stuff.
-	WNDPROC						m_oldProc;
-	HWND						m_hwnd;
-	HWND						m_editorWnd;
-	HWND						m_horizBar;
+	WNDPROC							m_oldProc;
+	HWND							m_hwnd;
+	HWND							m_editorWnd;
+	HWND							m_horizBar;
 
 	// Text.
-	IVsTextView*				m_view;
-	long						m_numLines;
-	CEditCmdFilter*				m_editCmdFilter;
+	IVsTextView*					m_view;
+	long							m_numLines;
+	CEditCmdFilter*					m_editCmdFilter;
 
 	// Painting.
-	bool						m_codeImgDirty;
-	HBITMAP						m_codeImg;
-	HDC							m_imgDC;
-	HBITMAP						m_backBufferImg;
-	HDC							m_backBufferDC;
-	unsigned int*				m_backBufferBits;
-	unsigned int				m_backBufferWidth;
-	unsigned int				m_backBufferHeight;
+	bool							m_codeImgDirty;
+	HBITMAP							m_codeImg;
+	HDC								m_imgDC;
+	HBITMAP							m_backBufferImg;
+	HDC								m_backBufferDC;
+	unsigned int*					m_backBufferBits;
+	unsigned int					m_backBufferWidth;
+	unsigned int					m_backBufferHeight;
 
 	// Scrollbar stuff.
-	int							m_pageSize;
-	int							m_scrollPos;
-	int							m_scrollMin;
-	int							m_scrollMax;
-	bool						m_dragging;
+	int								m_pageSize;
+	int								m_scrollPos;
+	int								m_scrollMin;
+	int								m_scrollMax;
+	bool							m_dragging;
 
-	bool						GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
-	void						OnDrag(bool initial);
-	void						OnPaint(HDC ctrlDC);
-	void						HighlightMatchingWords();
-	void						RemoveWordHightlight();
-	void						AdjustSize(unsigned int requiredWidth);
-	void						MarkLineRange(std::vector<unsigned char>& markers, unsigned char flag, int start, int end);
-	void						FindMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer, int type, unsigned char flag);
-	void						GetHiddenLines(std::vector<unsigned char>& markers, IVsTextLines* buffer);
-	bool						GetFileName(CComBSTR& name, IVsTextLines* buffer);
-	void						FindBreakpoints(std::vector<unsigned char>& markers, IVsTextLines* buffer);
-	void						GetMarkers(std::vector<unsigned char>& markers, IVsTextLines* buffer);
-	void						PaintMarkers(unsigned int* line, unsigned char flags);
-	void						RenderCodeImg();
-	void						RemoveWndProcHook();
+	bool							GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
+	bool							GetFileName(CComBSTR& name, IVsTextLines* buffer);
+	void							ProcessLineMarkers(IVsTextLines* buffer, int type, const MarkerOperator& op);
+
+	void							OnDrag(bool initial);
+	void							OnPaint(HDC ctrlDC);
+	void							AdjustSize(unsigned int requiredWidth);
+	void							RemoveWndProcHook();
+
+	void							HighlightMatchingWords();
+	void							RemoveWordHighlight(IVsTextLines* buffer);
+
+	void							MarkLineRange(LineList& lines, unsigned int flag, int start, int end);
+	void							FindHiddenLines(LineList& lines, IVsTextLines* buffer);
+	void							FindBreakpoints(LineList& lines, IVsTextLines* buffer);
+	void							GetLineFlags(LineList& lines, IVsTextLines* buffer);
+	void							GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightList& storage);
+	void							PaintLineFlags(unsigned int* line, unsigned int flags);
+	void							PaintHighlights(unsigned int* line, const Highlight* highlights);
+	void							RenderCodeImg();
 };
