@@ -54,13 +54,14 @@ private:
 		LineMarker_ChangedUnsaved	= 0x02,
 		LineMarker_ChangedSaved		= 0x04,
 		LineMarker_Breakpoint		= 0x08,
-		LineMarker_Bookmark			= 0x10
+		LineMarker_Bookmark			= 0x10,
+		LineMarker_Match			= 0x20
 	};
 
 	struct Highlight
 	{
-		int							start;
-		int							end;
+		unsigned int				start;
+		unsigned int				end;
 		Highlight*					next;
 	};
 
@@ -129,6 +130,5 @@ private:
 	void							GetLineFlags(LineList& lines, IVsTextLines* buffer);
 	void							GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightList& storage);
 	void							PaintLineFlags(unsigned int* line, unsigned int flags);
-	void							PaintHighlights(unsigned int* line, const Highlight* highlights);
 	void							RenderCodeImg();
 };
