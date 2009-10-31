@@ -22,8 +22,10 @@
 class ATL_NO_VTABLE CMetalScrollPackage :
 	public CComObjectRootEx<CComSingleThreadModel>,
 	public CComCoClass<CMetalScrollPackage, &CLSID_MetalScrollPackage>,
-	public VSL::IVsPackageImpl<CMetalScrollPackage, &CLSID_MetalScrollPackage>,
-	public ATL::ISupportErrorInfoImpl<&__uuidof(IVsPackage)>
+	public IVsPackage,
+	public IServiceProvider,
+	public IVsTextMarkerTypeProvider,
+	public IVsPackageDefinedTextMarkerType
 {
 public:
 	CMetalScrollPackage()
@@ -34,7 +36,9 @@ public:
 
 	BEGIN_COM_MAP(CMetalScrollPackage)
 		COM_INTERFACE_ENTRY(IVsPackage)
-		COM_INTERFACE_ENTRY(ISupportErrorInfo)
+		COM_INTERFACE_ENTRY(IServiceProvider)
+		COM_INTERFACE_ENTRY(IVsTextMarkerTypeProvider)
+		COM_INTERFACE_ENTRY(IVsPackageDefinedTextMarkerType)
 	END_COM_MAP()
 
 	DECLARE_PROTECT_FINAL_CONSTRUCT()
@@ -48,11 +52,29 @@ public:
 	{
 	}
 
-	static const LoadUILibrary::ExtendedErrorInfo& GetLoadUILibraryErrorInfo()
-	{
-		static LoadUILibrary::ExtendedErrorInfo errorInfo(L"The product is not installed properly. Please reinstall.");
-		return errorInfo;
-	}
+	// IVsPackage implementation.
+	STDMETHOD(SetSite)(IServiceProvider* serviceProvider);
+	STDMETHOD(QueryClose)(BOOL* canClose) { if(canClose) { *canClose = TRUE; return S_OK; } else return E_POINTER; }
+	STDMETHOD(Close)(void){ return S_OK; }
+	STDMETHOD(GetAutomationObject)(LPCOLESTR /*propName*/, IDispatch** /*disp*/) { return E_NOTIMPL; }
+	STDMETHOD(CreateTool)(REFGUID /*persistenceSlot*/){ return E_NOTIMPL; }
+	STDMETHOD(ResetDefaults)(VSPKGRESETFLAGS /*flags*/){ return S_OK; }
+	STDMETHOD(GetPropertyPage)(REFGUID /*page*/, VSPROPSHEETPAGE* /*page*/) { return E_NOTIMPL; }
+
+	// IServiceProvider implementation.
+	STDMETHOD(QueryService)(REFGUID guidService, REFIID riid, void** object);
+
+	// IVsTextMarkerTypeProvider implementation.
+	STDMETHOD(GetTextMarkerType)(GUID* guidMarker, IVsPackageDefinedTextMarkerType** markerType);
+
+	// IVsPackageDefinedTextMarkerType implementation.
+	STDMETHOD(GetVisualStyle)(DWORD* visualFlags);
+	STDMETHOD(GetDefaultColors)(COLORINDEX* foreground, COLORINDEX* background);
+	STDMETHOD(GetDefaultLineStyle)(COLORINDEX* lineColor, LINESTYLE* lineIndex);
+	STDMETHOD(GetDefaultFontFlags)(DWORD* fontFlags);
+	STDMETHOD(DrawGlyphWithColors)(HDC hdc, RECT* rect, long markerType, IVsTextMarkerColorSet* markerColors, DWORD glyphDrawFlags, long lineHeight);
+	STDMETHOD(GetBehaviorFlags)(DWORD* flags);
+	STDMETHOD(GetPriorityIndex)(long* priorityIndex);
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(MetalScrollPackage), CMetalScrollPackage)
