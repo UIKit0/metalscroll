@@ -26,10 +26,7 @@ class ATL_NO_VTABLE CConnect :
 	public CComCoClass<CConnect, &CLSID_Connect>,
 	public IDispatchImpl<_IDTExtensibility2, &IID__IDTExtensibility2, &LIBID_AddInDesignerObjects, 1, 0>,
 	public IVsTextManagerEvents,
-	public IVsTextViewEvents,
-	public IServiceProvider,
-	public IVsTextMarkerTypeProvider,
-	public IVsPackageDefinedTextMarkerType
+	public IVsTextViewEvents
 {
 public:
 	CConnect();
@@ -42,9 +39,6 @@ public:
 		COM_INTERFACE_ENTRY(IDTExtensibility2)
 		COM_INTERFACE_ENTRY(IVsTextManagerEvents)
 		COM_INTERFACE_ENTRY(IVsTextViewEvents)
-		COM_INTERFACE_ENTRY(IServiceProvider)
-		COM_INTERFACE_ENTRY(IVsTextMarkerTypeProvider)
-		COM_INTERFACE_ENTRY(IVsPackageDefinedTextMarkerType)
 	END_COM_MAP()
 
 	DECLARE_PROTECT_FINAL_CONSTRUCT()
@@ -58,6 +52,7 @@ public:
 	{
 	}
 
+	// _IDTExtensibility2 implementation.
 	STDMETHOD(OnConnection)(IDispatch* application, ext_ConnectMode connectMode, IDispatch* addInInst, SAFEARRAY** custom);
 	STDMETHOD(OnDisconnection)(ext_DisconnectMode removeMode, SAFEARRAY** custom);
 	STDMETHOD(OnAddInsUpdate)(SAFEARRAY** /*custom*/) { return S_OK; }
@@ -76,21 +71,6 @@ public:
 	void STDMETHODCALLTYPE		OnSetBuffer(IVsTextView* /*view*/, IVsTextLines* /*buffer*/) {}
 	void STDMETHODCALLTYPE		OnChangeScrollInfo(IVsTextView* /*view*/, long /*bar*/, long /*minUnit*/, long /*maxUnits*/, long /*visibleUnits*/, long /*firstVisibleUnit*/) {}
 	void STDMETHODCALLTYPE		OnChangeCaretLine(IVsTextView* /*view*/, long /*newLine*/, long /*oldLine*/) {}
-
-	// IServiceProvider implementation.
-	STDMETHOD(QueryService)(REFGUID guidService, REFIID riid, void** object);
-
-	// IVsTextMarkerTypeProvider implementation.
-	STDMETHOD(GetTextMarkerType)(GUID* guidMarker, IVsPackageDefinedTextMarkerType** markerType);
-
-	// IVsPackageDefinedTextMarkerType implementation.
-	STDMETHOD(GetVisualStyle)(DWORD* visualFlags);
-	STDMETHOD(GetDefaultColors)(COLORINDEX* foreground, COLORINDEX* background);
-	STDMETHOD(GetDefaultLineStyle)(COLORINDEX* lineColor, LINESTYLE* lineIndex);
-	STDMETHOD(GetDefaultFontFlags)(DWORD* fontFlags);
-	STDMETHOD(DrawGlyphWithColors)(HDC hdc, RECT* rect, long markerType, IVsTextMarkerColorSet* markerColors, DWORD glyphDrawFlags, long lineHeight);
-	STDMETHOD(GetBehaviorFlags)(DWORD* flags);
-	STDMETHOD(GetPriorityIndex)(long* priorityIndex);
 
 private:
 	DWORD						m_textMgrEventsCookie;
