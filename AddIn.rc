@@ -62,8 +62,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,1,34
- PRODUCTVERSION 1,0,1,34
+ FILEVERSION 1,0,2,36
+ PRODUCTVERSION 1,0,2,36
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -80,12 +80,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Griffin Software"
             VALUE "FileDescription", "MetalScroll Add-in"
-            VALUE "FileVersion", "1, 0, 1, 34"
+            VALUE "FileVersion", "1, 0, 2, 36"
             VALUE "InternalName", "MetalScroll.dll"
             VALUE "LegalCopyright", "(c) 2009 Griffin Software"
             VALUE "OriginalFilename", "MetalScroll.dll"
             VALUE "ProductName", "MetalScroll"
-            VALUE "ProductVersion", "1, 0, 1, 34"
+            VALUE "ProductVersion", "1, 0, 2, 36"
         END
     END
     BLOCK "VarFileInfo"
