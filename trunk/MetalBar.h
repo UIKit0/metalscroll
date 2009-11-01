@@ -89,6 +89,7 @@ private:
 	HWND							m_hwnd;
 	HWND							m_editorWnd;
 	HWND							m_horizBar;
+	HWND							m_tooltipWnd;
 
 	// Text.
 	IVsTextView*					m_view;
@@ -111,13 +112,17 @@ private:
 	int								m_scrollMin;
 	int								m_scrollMax;
 	bool							m_dragging;
+	bool							m_tooltipShown;
 
+	void							InitTooltip();
 	bool							GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
 	bool							GetFileName(CComBSTR& name, IVsTextLines* buffer);
 	void							ProcessLineMarkers(IVsTextLines* buffer, int type, const MarkerOperator& op);
 
 	void							OnDrag(bool initial);
+	void							OnTrackTooltip();
 	void							OnPaint(HDC ctrlDC);
+	void							OnGetTooltipInfo(NMTTDISPINFOA* tooltipInfo);
 	void							AdjustSize(unsigned int requiredWidth);
 	void							RemoveWndProcHook();
 

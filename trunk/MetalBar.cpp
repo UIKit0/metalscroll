@@ -70,6 +70,8 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 
 	s_bars.insert(this);
 	AdjustSize(s_barWidth);
+
+	InitTooltip();
 }
 
 MetalBar::~MetalBar()
@@ -92,10 +94,34 @@ MetalBar::~MetalBar()
 		DeleteObject(m_backBufferDC);
 }
 
+void MetalBar::InitTooltip()
+{
+	DWORD style = WS_POPUP | TTS_ALWAYSTIP | TTS_BALLOON | TTS_NOPREFIX | TTS_NOANIMATE | TTS_NOFADE;
+	m_tooltipWnd = CreateWindowEx(0, TOOLTIPS_CLASS, 0, style, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, m_hwnd, 0, _AtlModule.GetResourceInstance(), 0);
+
+	TOOLINFO toolInfo;
+	memset(&toolInfo, 0, sizeof(toolInfo));
+	toolInfo.cbSize = sizeof(toolInfo);
+	toolInfo.hwnd = m_hwnd;
+	toolInfo.uFlags = TTF_IDISHWND | TTF_TRACK;
+	toolInfo.uId = (UINT_PTR)m_hwnd;
+	toolInfo.lpszText = L"nothing";
+	SendMessage(m_tooltipWnd, TTM_ADDTOOL, 0, (LPARAM)&toolInfo);
+	SendMessage(m_tooltipWnd, TTM_SETMAXTIPWIDTH, 0, 1024);
+
+	m_tooltipShown = false;
+}
+
 void MetalBar::RemoveWndProcHook()
 {
 	SetWindowLongPtr(m_hwnd, GWL_USERDATA, 0);
 	SetWindowLongPtr(m_hwnd, GWL_WNDPROC, (::LONG_PTR)m_oldProc);
+
+	if(m_tooltipWnd)
+	{
+		DestroyWindow(m_tooltipWnd);
+		m_tooltipWnd = 0;
+	}
 }
 
 void MetalBar::RemoveAllBars()
@@ -172,6 +198,56 @@ void MetalBar::OnDrag(bool initial)
 		PostMessage(parent, WM_VSCROLL, SB_ENDSCROLL, (LPARAM)m_hwnd);
 }
 
+static int clamp(int x, int m, int M)
+{
+	return (x < m) ? m : ((x > M) ? M : x);
+}
+
+void MetalBar::OnTrackTooltip()
+{
+	POINT mouse;
+	GetCursorPos(&mouse);
+
+	RECT clRect;
+	GetWindowRect(m_hwnd, &clRect);
+
+	int codeImgHeight = std::min((int)m_backBufferHeight, (int)m_numLines);
+	int line = clamp(mouse.y - clRect.top, 0, codeImgHeight);
+
+	// Move the tooltip.
+	mouse.x = clamp(mouse.x, clRect.left, clRect.right);
+	mouse.y = line + clRect.top;
+	SendMessage(m_tooltipWnd, TTM_TRACKPOSITION, 0, MAKELPARAM(mouse.x, mouse.y));
+
+	// Determine the line if the code image is scaled.
+	if((int)m_backBufferHeight < m_numLines)
+		line = int(1.0f * line * m_numLines / m_backBufferHeight);
+	
+	CComPtr<IVsTextLines> buffer;
+	HRESULT hr = m_view->GetBuffer(&buffer);
+	if(FAILED(hr) || !buffer)
+		return;
+
+	long numLines;
+	hr = buffer->GetLineCount(&numLines);
+	if(FAILED(hr))
+		return;
+
+	CComBSTR text;
+	int minLine = std::max(0, line - 10);
+	int maxLine = std::min((int)numLines - 1, line + 10);
+	hr = buffer->GetLineText(minLine, 0, maxLine, 0, &text);
+	if(FAILED(hr) || !text)
+		return;
+
+	TOOLINFO ti = { 0 };
+	ti.cbSize = sizeof(ti);
+	ti.hwnd = m_hwnd;
+	ti.uId = (UINT_PTR)m_hwnd;
+	ti.lpszText = text;
+	SendMessage(m_tooltipWnd, TTM_UPDATETIPTEXT, 0, (LPARAM)&ti);
+}
+
 LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
 	WNDPROC oldProc = m_oldProc;
@@ -204,11 +280,15 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 		case WM_WINDOWPOSCHANGED:
 		case WM_SIZE:
+		{
 			AdjustSize(s_barWidth);
 			break;
+		}
 
 		case WM_ERASEBKGND:
+		{
 			return 0;
+		}
 
 		// Don't let the system see the SBM_ and mouse messages because it will draw the thumb over us.
 		case SBM_SETSCROLLINFO:
@@ -244,11 +324,14 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		}
 
 		case SBM_SETPOS:
+		{
 			m_scrollPos = (int)wparam;
 			InvalidateRect(hwnd, 0, FALSE);
 			return m_scrollPos;
+		}
 
 		case SBM_SETRANGE:
+		{
 			if( (m_scrollMin != (int)wparam) || (m_scrollMax != (int)lparam) )
 			{
 				m_scrollMin = (int)wparam;
@@ -257,30 +340,68 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 				InvalidateRect(hwnd, 0, FALSE);
 			}
 			return m_scrollPos;
+		}
 
 		case WM_LBUTTONDOWN:
+		{
 			m_dragging = true;
 			SetCapture(hwnd);
 			OnDrag(true);
 			return 0;
+		}
 
 		case WM_MOUSEMOVE:
+		{
 			if(m_dragging)
 				OnDrag(false);
+
+			if(m_tooltipShown)
+				OnTrackTooltip();
+
 			return 0;
+		}
 
 		case WM_LBUTTONUP:
+		{
 			if(m_dragging)
 			{
 				ReleaseCapture();
 				m_dragging = false;
 			}
 			return 0;
+		}
 
 		case WM_LBUTTONDBLCLK:
 		{
 			OptionsDialog dlg;
 			dlg.Execute();
+			return 0;
+		}
+
+		case WM_MBUTTONDOWN:
+		{
+			SetCapture(m_hwnd);
+			m_tooltipShown = true;
+			TOOLINFO ti;
+			ti.cbSize = sizeof(ti);
+			ti.hwnd = m_hwnd;
+			ti.uId = (UINT_PTR)m_hwnd;
+			SendMessage(m_tooltipWnd, TTM_TRACKACTIVATE, TRUE, (LPARAM)&ti);
+			OnTrackTooltip();
+			return 0;
+		}
+
+		case WM_MBUTTONUP:
+		{
+			if(!m_tooltipShown)
+				return 0;
+
+			ReleaseCapture();
+			TOOLINFO ti;
+			ti.cbSize = sizeof(ti);
+			ti.hwnd = m_hwnd;
+			ti.uId = (UINT_PTR)m_hwnd;
+			SendMessage(m_tooltipWnd, TTM_TRACKACTIVATE, FALSE, (LPARAM)&ti);
 			return 0;
 		}
 
@@ -319,6 +440,8 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 				m_codeImgDirty = true;
 				InvalidateRect(hwnd, 0, 0);
 			}
+			// Don't let the default window procedure see right button up events, or it will display the
+			// Windows scrollbar menu (scroll here, page up, page down etc.).
 			return 0;
 		}
 	}
