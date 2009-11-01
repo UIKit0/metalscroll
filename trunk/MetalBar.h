@@ -122,7 +122,6 @@ private:
 	void							OnDrag(bool initial);
 	void							OnTrackTooltip();
 	void							OnPaint(HDC ctrlDC);
-	void							OnGetTooltipInfo(NMTTDISPINFOA* tooltipInfo);
 	void							AdjustSize(unsigned int requiredWidth);
 	void							RemoveWndProcHook();
 
