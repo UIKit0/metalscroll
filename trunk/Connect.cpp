@@ -54,6 +54,8 @@ bool CConnect::GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* vie
 
 STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*connectMode*/, IDispatch* addInInst, SAFEARRAY** /*custom*/)
 {
+	Log("MetalScroll: OnConnection()\n");
+
 	HRESULT hr = application->QueryInterface(__uuidof(EnvDTE80::DTE2), (void**)&g_dte);
 	if(FAILED(hr))
 		return hr;
@@ -80,11 +82,15 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 
 	hr = g_textMgr->GetRegisteredMarkerTypeID(&g_markerTypeGUID, &g_highlightMarkerType);
 	if(FAILED(hr))
+	{
+		Log("MetalScroll: No highlight marker.\n");
 		g_highlightMarkerType = 0;
+	}
 
 	MetalBar::ReadSettings();
 	ColorChip::Register();
 
+	Log("MetalScroll: OnConnection() done.\n");
 	return S_OK;
 }
 
@@ -109,6 +115,8 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 
 void STDMETHODCALLTYPE CConnect::OnRegisterView(IVsTextView* view)
 {
+	Log("MetalScroll: New view registered: 0x%p.\n", view);
+
 	// Unfortunately, the window hasn't been created at this point yet, so we can't get the HWND
 	// here. Register an even handler to catch SetFocus(), and get the HWND from there. We'll remove
 	// the handler after the first SetFocus() as we don't care about getting more events once we
@@ -117,7 +125,11 @@ void STDMETHODCALLTYPE CConnect::OnRegisterView(IVsTextView* view)
 	if(!GetTextViewEventsPlug(&connPt, view))
 		return;
 	DWORD cookie;
-	connPt->Advise((IVsTextViewEvents*)this, &cookie);
+	HRESULT hr = connPt->Advise((IVsTextViewEvents*)this, &cookie);
+	if(FAILED(hr))
+		return;
+
+	Log("MetalScroll: Subscribed to view events.\n");
 }
 
 struct ScrollbarHandles
@@ -162,18 +174,27 @@ void CConnect::HookScrollbar(IVsTextView* view)
 	ScrollbarHandles bars = { 0 };
 	EnumChildWindows(GetParent(editorHwnd), FindScrollbars, (LPARAM)&bars);
 	if(!bars.horiz || !bars.vert)
+	{
+		Log("MetalScroll: Scrollbars not found.\n");
 		return;
+	}
 
 	if(GetWindowLongPtr(bars.vert, GWL_USERDATA) != 0)
+	{
+		Log("MetalScroll: Scrollbar has non-null user data.\n");
 		return;
+	}
 
 	WNDPROC oldProc = (WNDPROC)SetWindowLongPtr(bars.vert, GWLP_WNDPROC, (::LONG_PTR)ScrollBarProc);
 	MetalBar* bar = new MetalBar(bars.vert, editorHwnd, bars.horiz, oldProc, view);
 	SetWindowLongPtr(bars.vert, GWL_USERDATA, (::LONG_PTR)bar);
+	Log("MetalScroll: Hooked view 0x%p. Scrollbars: %x, %x. Editor: %x. MetalBar: 0x%p.\n", view, bars.vert, bars.horiz, editorHwnd, bar);
 }
 
 void STDMETHODCALLTYPE CConnect::OnSetFocus(IVsTextView* view)
 {
+	Log("MetalScroll: OnSetFocus(0x%p).\n", view);
+
 	HookScrollbar(view);
 
 	// Remove ourselves from the event list. Since we can't store the cookie we got

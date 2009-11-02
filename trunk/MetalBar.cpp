@@ -669,7 +669,15 @@ bool MetalBar::GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLine
 {
 	HRESULT hr = m_view->GetBuffer(buffer);
 	if(FAILED(hr) || !*buffer)
+	{
+		static bool warningShown = false;
+		if(!warningShown)
+		{
+			Log("MetalScroll: Failed to get buffer for view 0x%p.", m_view);
+			warningShown = true;
+		}
 		return false;
+	}
 
 	hr = (*buffer)->GetLineCount(numLines);
 	if(FAILED(hr))

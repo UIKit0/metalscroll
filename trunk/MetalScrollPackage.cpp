@@ -23,10 +23,17 @@ const GUID g_markerServGUID = { 0x454DB430, 0x837D, 0x4435, { 0xB7, 0xC1, 0xF5, 
 // {FF447164-72F9-42ed-A767-C737B86BBD0B} is the GUID for the marker type.
 const GUID g_markerTypeGUID = { 0xFF447164, 0x72F9, 0x42ed, { 0xA7, 0x67, 0xC7, 0x37, 0xB8, 0x6B, 0xBD, 0x0B } };
 
+CMetalScrollPackage::CMetalScrollPackage()
+{
+	Log("MetalScroll: Package constructed.\n");
+}
+
 STDMETHODIMP CMetalScrollPackage::SetSite(IServiceProvider* serviceProvider)
 {
 	if(!serviceProvider)
 		return S_OK;
+
+	Log("MetalScroll: SetSite().\n");
 
 	CComPtr<IProfferService> profferServ;
 	HRESULT hr = serviceProvider->QueryService(SID_SProfferService, IID_IProfferService, (void**)&profferServ);
@@ -36,8 +43,12 @@ STDMETHODIMP CMetalScrollPackage::SetSite(IServiceProvider* serviceProvider)
 	DWORD cookie;
 	hr = profferServ->ProfferService(g_markerServGUID, (IServiceProvider*)this, &cookie);
 	if(FAILED(hr))
+	{
+		Log("MetalScroll: ProfferService() failed.\n");
 		return hr;
+	}
 
+	Log("MetalScroll: SetSite() done.\n");
 	return S_OK;
 }
 

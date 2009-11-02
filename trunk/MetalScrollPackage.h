@@ -29,9 +29,7 @@ class ATL_NO_VTABLE CMetalScrollPackage :
 	public IVsMergeableUIItem
 {
 public:
-	CMetalScrollPackage()
-	{
-	}
+	CMetalScrollPackage();
 
 	DECLARE_REGISTRY_RESOURCEID(IDR_METALSCROLLPACKAGE)
 
