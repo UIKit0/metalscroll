@@ -90,6 +90,24 @@ private:
 extern CAddInModule _AtlModule;
 
 #include <assert.h>
+#include <stdarg.h>
 #include <vector>
 #include <set>
 #include <algorithm>
+
+#define ENABLE_LOGGING			1
+
+static inline void Log(const char* fmt, ...)
+{
+#if ENABLE_LOGGING
+	char buf[256];
+	va_list ap;
+	va_start(ap, fmt);
+	_vsnprintf(buf, sizeof(buf), fmt, ap);
+	buf[sizeof(buf)-1] = 0;
+	va_end(ap);
+	OutputDebugStringA(buf);
+#else
+	fmt;
+#endif
+}
