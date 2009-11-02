@@ -707,7 +707,12 @@ void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightLis
 			if(!line.highlights)
 				bar->MarkLineRange(lines, LineMarker_Match, span.iStartLine, span.iStartLine);
 
-			// Preserve ordering.
+			// Preserve ordering. Since this is a linear search, it sounds like it would lead to quadratic behavior
+			// (well, O(lines*matches_per_line), actually) but it doesn't. VS pushes newly created markers at the top
+			// of a list; we create them in ascending order, by scanning the text, so they end up in reverse order in
+			// the list. This means we get them in descending order here, so we add them to our list in constant time
+			// in the following if block. Obviously, there's no guarantee to this, which is why we do the full scan if
+			// needed, but it seems to hold true in all the scenarios I've tested.
 			Highlight* h = line.highlights;
 			if(!h || (h->start > newh->start))
 			{
