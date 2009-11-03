@@ -1142,6 +1142,8 @@ void MetalBar::HighlightMatchingWords()
 		return;
 
 	unsigned int selTextLen = selText.Length();
+	if(selTextLen < 1)
+		return;
 
 	int line = 0;
 	int column = 0;
