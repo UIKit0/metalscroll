@@ -1,4 +1,4 @@
- Version 1.0.3 (revision 40)
+ Version 1.0.4 (revision 41)
 -----------------------------
   - fixed: alt-double click on a blank line freezes the IDE
 
