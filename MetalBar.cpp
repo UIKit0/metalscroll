@@ -1126,6 +1126,20 @@ void MetalBar::RemoveWordHighlight(IVsTextLines* buffer)
 	ProcessLineMarkers(buffer, g_highlightMarkerType, DeleteMarkerOp());
 }
 
+static bool IsSeparator(wchar_t chr)
+{
+	if( (chr >= L'0') && (chr <= L'9') )
+		return false;
+
+	if( (chr >= L'A') && (chr <= L'Z') )
+		return false;
+
+	if( (chr >= L'a') && (chr <= L'z') )
+		return false;
+
+	return true;
+}
+
 void MetalBar::HighlightMatchingWords()
 {
 	CComPtr<IVsTextLines> buffer;
@@ -1160,7 +1174,7 @@ void MetalBar::HighlightMatchingWords()
 			continue;
 		}
 
-		if(wcsncmp(chr, selText, selTextLen) == 0)
+		if( (wcsncmp(chr, selText, selTextLen) == 0) && (chr == allText || IsSeparator(chr[-1])) && IsSeparator(chr[selTextLen]) )
 		{
 			buffer->CreateLineMarker(g_highlightMarkerType, line, column, line, column + selTextLen, 0, 0);
 			// Make sure we don't create overlapping markers.
