@@ -41,6 +41,25 @@ void OptionsDialog::InitDialog(HWND hwnd)
 
 	m_barWidth = MetalBar::s_barWidth;
 	SetDlgItemInt(hwnd, IDC_BAR_WIDTH, m_barWidth, FALSE);
+
+	m_requireALT = MetalBar::s_requireAltForHighlight;
+	int state = m_requireALT ? BST_CHECKED : BST_UNCHECKED;
+	CheckDlgButton(hwnd, IDC_REQUIRE_ALT, state);
+}
+
+void OptionsDialog::OnOK(HWND hwnd)
+{
+	BOOL intOk;
+
+	// Read the integers.
+	m_cursorTrans = GetDlgItemInt(hwnd, IDC_CURSOR_TRANS, &intOk, FALSE);
+	if(!intOk)
+		m_cursorTrans = MetalBar::s_cursorColor >> 24;
+	m_barWidth = GetDlgItemInt(hwnd, IDC_BAR_WIDTH, &intOk, FALSE);
+	if(!intOk)
+		m_barWidth = MetalBar::s_barWidth;
+
+	m_requireALT = (IsDlgButtonChecked(hwnd, IDC_REQUIRE_ALT) == BST_CHECKED);
 }
 
 INT_PTR CALLBACK OptionsDialog::DlgProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -63,16 +82,8 @@ INT_PTR CALLBACK OptionsDialog::DlgProc(HWND hwnd, UINT msg, WPARAM wparam, LPAR
 			{
 				case IDOK:
 				{
-					BOOL intOk;
 					OptionsDialog* dlg = (OptionsDialog*)GetWindowLongPtr(hwnd, GWL_USERDATA);
-
-					// Read the integers.
-					dlg->m_cursorTrans = GetDlgItemInt(hwnd, IDC_CURSOR_TRANS, &intOk, FALSE);
-					if(!intOk)
-						dlg->m_cursorTrans = MetalBar::s_cursorColor >> 24;
-					dlg->m_barWidth = GetDlgItemInt(hwnd, IDC_BAR_WIDTH, &intOk, FALSE);
-					if(!intOk)
-						dlg->m_barWidth = MetalBar::s_barWidth;
+					dlg->OnOK(hwnd);
 
 					// Close the dialog.
 					EndDialog(hwnd, DlgRet_Ok);
@@ -131,8 +142,8 @@ void OptionsDialog::Execute()
 	MetalBar::s_breakpointColor = m_breakpoints.GetColor();
 	MetalBar::s_bookmarkColor = m_bookmarks.GetColor();
 	MetalBar::s_cursorColor = (m_cursorColor.GetColor() & 0xffffff) | ((m_cursorTrans & 0xff) << 24);
-
 	MetalBar::s_barWidth = m_barWidth;
+	MetalBar::s_requireAltForHighlight = m_requireALT;
 
 	MetalBar::SaveSettings();
 }

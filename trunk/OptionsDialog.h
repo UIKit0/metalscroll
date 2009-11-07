@@ -45,6 +45,8 @@ private:
 	ColorChip					m_bookmarks;
 	unsigned int				m_cursorTrans;
 	unsigned int				m_barWidth;
+	unsigned int				m_requireALT;
 
 	void						InitDialog(HWND hwnd);
+	void						OnOK(HWND hwnd);
 };

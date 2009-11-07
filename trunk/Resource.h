@@ -20,6 +20,7 @@
 #define IDC_BREAKPOINTS                 211
 #define IDC_RESET                       212
 #define IDC_BOOKMARKS                   213
+#define IDC_REQUIRE_ALT                 214
 
 // Next default values for new objects
 // 
@@ -27,7 +28,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        202
 #define _APS_NEXT_COMMAND_VALUE         32768
-#define _APS_NEXT_CONTROL_VALUE         213
+#define _APS_NEXT_CONTROL_VALUE         215
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

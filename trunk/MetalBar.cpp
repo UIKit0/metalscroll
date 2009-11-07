@@ -37,6 +37,7 @@ unsigned int MetalBar::s_modifiedLineColor;
 unsigned int MetalBar::s_unsavedLineColor;
 unsigned int MetalBar::s_breakpointColor;
 unsigned int MetalBar::s_bookmarkColor;
+unsigned int MetalBar::s_requireAltForHighlight;
 
 std::set<MetalBar*> MetalBar::s_bars;
 
@@ -1034,6 +1035,7 @@ void MetalBar::ResetSettings()
 	s_unsavedLineColor = 0xffe1621e;
 	s_breakpointColor = 0xffff0000;
 	s_bookmarkColor = 0xff0000ff;
+	s_requireAltForHighlight = TRUE;
 }
 
 bool MetalBar::ReadRegInt(unsigned int* to, HKEY key, const char* name)
@@ -1073,6 +1075,7 @@ void MetalBar::ReadSettings()
 	ReadRegInt(&s_unsavedLineColor, key, "UnsavedLineColor");
 	ReadRegInt(&s_breakpointColor, key, "BreakpointColor");
 	ReadRegInt(&s_bookmarkColor, key, "BookmarkColor");
+	ReadRegInt(&s_requireAltForHighlight, key, "RequireALT");
 
 	RegCloseKey(key);
 }
@@ -1100,6 +1103,7 @@ void MetalBar::SaveSettings()
 	WriteRegInt(key, "UnsavedLineColor", s_unsavedLineColor);
 	WriteRegInt(key, "BreakpointColor", s_breakpointColor);
 	WriteRegInt(key, "BookmarkColor", s_bookmarkColor);
+	WriteRegInt(key, "RequireALT", s_requireAltForHighlight);
 
 	RegCloseKey(key);
 
