@@ -57,11 +57,15 @@ STDMETHODIMP CEditCmdFilter::Exec(const GUID* cmdGroup, DWORD cmdID, DWORD cmdex
 		{
 			case ECMD_DOUBLECLICK:
 			{
-				// If the user double-clicked in the editor with ALT held down, send a message to the scrollbar, so that
-				// it applies a marker on all occurrences of the selected word and highlights it in the code image.
-				DWORD state = GetAsyncKeyState(VK_MENU);
-				if(state & 80000000)
-					PostMessage(m_bar->GetHwnd(), (WM_USER + 1), 0, 0);
+				if(MetalBar::s_requireAltForHighlight)
+				{
+					DWORD state = GetAsyncKeyState(VK_MENU);
+					if(!(state & 80000000))
+						break;
+				}
+
+				// Tell the scrollbar to apply a marker on all occurrences of the selected word and highlights it in the code image.
+				PostMessage(m_bar->GetHwnd(), (WM_USER + 1), 0, 0);
 				break;
 			}
 

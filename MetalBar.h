@@ -46,6 +46,7 @@ public:
 	static unsigned int				s_unsavedLineColor;
 	static unsigned int				s_breakpointColor;
 	static unsigned int				s_bookmarkColor;
+	static unsigned int				s_requireAltForHighlight;
 
 private:
 	enum LineMarker
