@@ -1059,9 +1059,7 @@ void MetalBar::ReadSettings()
 	ResetSettings();
 
 	HKEY key;
-	// We can't use the constant HKEY_CURRENT_USER because some retard felt the need to define ULONG_PTR inside the EnvDTE
-	// namespace, and the compiler reports an ambiguous symbol inside the define.
-	if(RegOpenKeyExA((HKEY)0x80000001, "Software\\Griffin Software\\MetalScroll", 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
+	if(RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Griffin Software\\MetalScroll", 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
 		return;
 
 	ReadRegInt(&s_barWidth, key, "BarWidth");
@@ -1139,6 +1137,9 @@ static bool IsSeparator(wchar_t chr)
 		return false;
 
 	if( (chr >= L'a') && (chr <= L'z') )
+		return false;
+
+	if(chr == L'_')
 		return false;
 
 	return true;
