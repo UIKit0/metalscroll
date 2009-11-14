@@ -94,6 +94,9 @@ extern CAddInModule _AtlModule;
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <intrin.h>
+#include <xmmintrin.h>
+#include <emmintrin.h>
 
 #define ENABLE_LOGGING			1
 

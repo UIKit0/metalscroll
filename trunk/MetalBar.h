@@ -98,8 +98,9 @@ private:
 	CEditCmdFilter*					m_editCmdFilter;
 
 	// Painting.
-	bool							m_codeImgDirty;
 	HBITMAP							m_codeImg;
+	int								m_codeImgHeight;
+	bool							m_codeImgDirty;
 	HDC								m_imgDC;
 	HBITMAP							m_backBufferImg;
 	HDC								m_backBufferDC;
@@ -135,5 +136,5 @@ private:
 	void							GetLineFlags(LineList& lines, IVsTextLines* buffer);
 	void							GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightList& storage);
 	void							PaintLineFlags(unsigned int* line, unsigned int flags);
-	void							RenderCodeImg();
+	void							RenderCodeImg(int barHeight);
 };

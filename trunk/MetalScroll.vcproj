@@ -58,6 +58,8 @@
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
+				EnableEnhancedInstructionSet="1"
+				FloatingPointModel="2"
 				UsePrecompiledHeader="2"
 				PrecompiledHeaderThrough="MetalScrollPCH.h"
 				WarningLevel="4"
@@ -146,9 +148,15 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
 				AdditionalIncludeDirectories=""
 				PreprocessorDefinitions="WIN32;_WINDOWS;NDEBUG;_USRDLL"
+				StringPooling="true"
 				RuntimeLibrary="2"
+				BufferSecurityCheck="false"
+				EnableEnhancedInstructionSet="1"
+				FloatingPointModel="2"
 				UsePrecompiledHeader="2"
 				PrecompiledHeaderThrough="MetalScrollPCH.h"
 				WarningLevel="4"
@@ -257,6 +265,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\ImageScaling.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\MetalBar.cpp"
 				>
 			</File>
@@ -304,6 +316,10 @@
 			</File>
 			<File
 				RelativePath=".\EditCmdFilter.h"
+				>
+			</File>
+			<File
+				RelativePath=".\ImageScaling.h"
 				>
 			</File>
 			<File
