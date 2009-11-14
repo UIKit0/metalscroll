@@ -664,7 +664,7 @@ void MetalBar::PaintLineFlags(unsigned int* line, unsigned int flags)
 	else
 		return;
 
-	for(int i = 59; i < 64; ++i)
+	for(unsigned int i = s_barWidth - 5; i < s_barWidth; ++i)
 		line[i] = color;
 }
 
