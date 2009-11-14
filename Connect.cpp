@@ -19,6 +19,7 @@
 #include "MetalBar.h"
 #include "ColorChip.h"
 #include "MarkerGUID.h"
+#include "ImageScaling.h"
 
 extern CAddInModule _AtlModule;
 
@@ -54,6 +55,8 @@ bool CConnect::GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* vie
 
 STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*connectMode*/, IDispatch* addInInst, SAFEARRAY** /*custom*/)
 {
+	InitScaler();
+
 	Log("MetalScroll: OnConnection()\n");
 
 	HRESULT hr = application->QueryInterface(__uuidof(EnvDTE80::DTE2), (void**)&g_dte);

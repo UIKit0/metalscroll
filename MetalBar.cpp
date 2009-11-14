@@ -18,6 +18,7 @@
 #include "MetalBar.h"
 #include "OptionsDialog.h"
 #include "EditCmdFilter.h"
+#include "ImageScaling.h"
 
 #define REFRESH_CODE_TIMER_ID		1
 #define REFRESH_CODE_INTERVAL		2000
@@ -52,8 +53,9 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 	m_view->AddRef();
 	m_numLines = 0;
 
-	m_codeImgDirty = true;
 	m_codeImg = 0;
+	m_codeImgHeight = 0;
+	m_codeImgDirty = true;
 	m_imgDC = 0;
 	m_backBufferImg = 0;
 	m_backBufferDC = 0;
@@ -756,7 +758,7 @@ void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightLis
 	++currentTextLine;													\
 	currentTextColumn = 0
 
-void MetalBar::RenderCodeImg()
+void MetalBar::RenderCodeImg(int barHeight)
 {
 	CComPtr<IVsTextLines> buffer;
 	CComBSTR text;
@@ -779,23 +781,10 @@ void MetalBar::RenderCodeImg()
 	HighlightList highlightStorage;
 	GetHighlights(lines, buffer, highlightStorage);
 
-	if(m_codeImg)
-		DeleteObject(m_codeImg);
-	
-	BITMAPINFO bi;
-	memset(&bi, 0, sizeof(bi));
-	bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
-	bi.bmiHeader.biWidth = s_barWidth;
-	bi.bmiHeader.biHeight = m_numLines;
-	bi.bmiHeader.biPlanes = 1;
-	bi.bmiHeader.biBitCount = 32;
-	bi.bmiHeader.biCompression = BI_RGB;
-	unsigned int* img = 0;
-	m_codeImg = CreateDIBSection(0, &bi, DIB_RGB_COLORS, (void**)&img, 0, 0);
-
 	unsigned int linePos = 0;
-	// Bitmaps are upside down for some retarded reason.
-	unsigned int* pixel = img + (m_numLines - 1)*s_barWidth;
+	unsigned int* imgBuffer = new unsigned int[m_numLines*s_barWidth];
+	// Windows bitmaps are upside down for some retarded reason.
+	unsigned int* pixel = imgBuffer + (m_numLines - 1)*s_barWidth;
 
 	enum CommentType
 	{
@@ -914,7 +903,39 @@ void MetalBar::RenderCodeImg()
 	ADVANCE_LINE();
 	assert(currentTextLine == m_numLines);
 
-	m_numLines = realNumLines + 1;
+	if(m_codeImg)
+		DeleteObject(m_codeImg);
+
+	// The image may be shorter than we anticipated due to hidden sections. Since bitmaps are upside down,
+	// we must skip the first part of the buffer, which represents the last (unused) lines.
+	realNumLines += 1;
+	unsigned int* realImgStart = imgBuffer + (m_numLines - realNumLines)*s_barWidth;
+	m_numLines = realNumLines;
+	m_codeImgHeight = m_numLines < barHeight ? m_numLines : barHeight;
+
+	BITMAPINFO bi;
+	memset(&bi, 0, sizeof(bi));
+	bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
+	bi.bmiHeader.biWidth = s_barWidth;
+	bi.bmiHeader.biHeight = m_codeImgHeight;
+	bi.bmiHeader.biPlanes = 1;
+	bi.bmiHeader.biBitCount = 32;
+	bi.bmiHeader.biCompression = BI_RGB;
+	unsigned int* bmpBits = 0;
+	m_codeImg = CreateDIBSection(0, &bi, DIB_RGB_COLORS, (void**)&bmpBits, 0, 0);
+
+	if(m_numLines < barHeight)
+	{
+		// Copy the buffer to the bitmap directly.
+		memcpy(bmpBits, realImgStart, m_numLines*s_barWidth*4);
+	}
+	else
+	{
+		// Scale.
+		ScaleImageVertically(bmpBits, barHeight, realImgStart, m_numLines, s_barWidth);
+	}
+
+	delete[] imgBuffer;
 
 	if(!m_imgDC)
 		m_imgDC = CreateCompatibleDC(0);
@@ -955,42 +976,34 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		m_backBufferHeight = barHeight;
 	}
 
+	// If the bar height has changed and we have more lines than vertical pixels, redraw the code image.
+	if( (m_numLines > barHeight) && (m_codeImgHeight != barHeight) )
+		m_codeImgDirty = true;
+
 	if(!m_codeImg || m_codeImgDirty)
 	{
-		RenderCodeImg();
 		m_codeImgDirty = false;
+		RenderCodeImg(barHeight);
 		// Re-arm the refresh timer.
 		SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
 	}
 
-	// Blit or scale the code image.
-	int imgHeight;
-	if(m_numLines <= barHeight)
-	{
-		// Blit the code image and fill the remaining space with the whitespace color.
-		imgHeight = m_numLines;
-		BitBlt(m_backBufferDC, clRect.left, clRect.top, s_barWidth, m_numLines, m_imgDC, 0, 0, SRCCOPY);
-		COLORREF oldColor = SetBkColor(m_backBufferDC, RGB_TO_COLORREF(s_whitespaceColor));
-		RECT remainingRect;
-		remainingRect.left = clRect.left;
-		remainingRect.right = clRect.right;
-		remainingRect.top = clRect.top + m_numLines;
-		remainingRect.bottom = clRect.bottom;
-		// Wondrous hack (c) MFC: fill a rect with ExtTextOut(), since it doesn't require us to create a brush.
-		ExtTextOut(m_backBufferDC, 0, 0, ETO_OPAQUE, &remainingRect, NULL, 0, NULL);
-		SetBkColor(m_backBufferDC, oldColor);
-	}
-	else
-	{
-		// Scale the image to fit the available space.
-		AlphaBlend(m_backBufferDC, clRect.left, clRect.top, s_barWidth, barHeight, m_imgDC, 0, 0, s_barWidth, m_numLines, blendFunc);
-		imgHeight = barHeight;
-	}
+	// Blit the code image and fill the remaining space with the whitespace color.
+	BitBlt(m_backBufferDC, clRect.left, clRect.top, s_barWidth, m_codeImgHeight, m_imgDC, 0, 0, SRCCOPY);
+	COLORREF oldColor = SetBkColor(m_backBufferDC, RGB_TO_COLORREF(s_whitespaceColor));
+	RECT remainingRect;
+	remainingRect.left = clRect.left;
+	remainingRect.right = clRect.right;
+	remainingRect.top = clRect.top + m_codeImgHeight;
+	remainingRect.bottom = clRect.bottom;
+	// Wondrous hack (c) MFC: fill a rect with ExtTextOut(), since it doesn't require us to create a brush.
+	ExtTextOut(m_backBufferDC, 0, 0, ETO_OPAQUE, &remainingRect, NULL, 0, NULL);
+	SetBkColor(m_backBufferDC, oldColor);
 
 	// Compute the size and position of the current page marker.
 	int range = m_scrollMax - m_scrollMin - m_pageSize + 2;
 	int cursor = m_scrollPos - m_scrollMin;
-	float normFact = 1.0f * imgHeight / range;
+	float normFact = (m_numLines < barHeight) ? 1.0f : 1.0f * barHeight / range;
 	int normalizedCursor = int(cursor * normFact);
 	int normalizedPage = int(m_pageSize * normFact);
 	if(normalizedPage > barHeight)
@@ -1086,8 +1099,7 @@ void MetalBar::WriteRegInt(HKEY key, const char* name, unsigned int val)
 void MetalBar::SaveSettings()
 {
 	HKEY key;
-	// See the comments in ReadSettings() about the magic constant.
-	if(RegCreateKeyExA((HKEY)0x80000001, "Software\\Griffin Software\\MetalScroll", 0, 0, 0, KEY_SET_VALUE, 0, &key, 0) != ERROR_SUCCESS)
+	if(RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\Griffin Software\\MetalScroll", 0, 0, 0, KEY_SET_VALUE, 0, &key, 0) != ERROR_SUCCESS)
 		return;
 
 	WriteRegInt(key, "BarWidth", s_barWidth);
