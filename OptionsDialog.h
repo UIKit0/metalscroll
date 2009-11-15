@@ -21,6 +21,9 @@
 class OptionsDialog
 {
 public:
+	static void					Init();
+	static void					Uninit();
+
 	void						Execute();
 
 private:
@@ -46,7 +49,10 @@ private:
 	unsigned int				m_cursorTrans;
 	unsigned int				m_barWidth;
 	unsigned int				m_requireALT;
+	unsigned int				m_codePreviewWidth;
+	unsigned int				m_codePreviewHeight;
 
 	void						InitDialog(HWND hwnd);
+	int							GetInt(HWND hwnd, int dlgItem, int defVal);
 	void						OnOK(HWND hwnd);
 };

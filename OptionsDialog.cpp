@@ -19,7 +19,7 @@
 #include "resource.h"
 #include "MetalBar.h"
 
-extern CComPtr<EnvDTE80::DTE2>		g_dte;
+extern HWND		g_mainVSHwnd;
 
 void OptionsDialog::InitDialog(HWND hwnd)
 {
@@ -36,28 +36,30 @@ void OptionsDialog::InitDialog(HWND hwnd)
 	m_bookmarks.Init(GetDlgItem(hwnd, IDC_BOOKMARKS), MetalBar::s_bookmarkColor);
 	m_cursorColor.Init(GetDlgItem(hwnd, IDC_CURSOR_COLOR), MetalBar::s_cursorColor);
 
-	m_cursorTrans = MetalBar::s_cursorColor >> 24;
-	SetDlgItemInt(hwnd, IDC_CURSOR_TRANS, m_cursorTrans, FALSE);
+	int cursorTrans = MetalBar::s_cursorColor >> 24;
+	SetDlgItemInt(hwnd, IDC_CURSOR_TRANS, cursorTrans, FALSE);
+	SetDlgItemInt(hwnd, IDC_BAR_WIDTH, MetalBar::s_barWidth, FALSE);
+	SetDlgItemInt(hwnd, IDC_PREVIEW_WIDTH, MetalBar::s_codePreviewWidth, FALSE);
+	SetDlgItemInt(hwnd, IDC_PREVIEW_HEIGHT, MetalBar::s_codePreviewHeight, FALSE);
 
-	m_barWidth = MetalBar::s_barWidth;
-	SetDlgItemInt(hwnd, IDC_BAR_WIDTH, m_barWidth, FALSE);
-
-	m_requireALT = MetalBar::s_requireAltForHighlight;
-	int state = m_requireALT ? BST_CHECKED : BST_UNCHECKED;
+	int state = MetalBar::s_requireAltForHighlight ? BST_CHECKED : BST_UNCHECKED;
 	CheckDlgButton(hwnd, IDC_REQUIRE_ALT, state);
+}
+
+int OptionsDialog::GetInt(HWND hwnd, int dlgItem, int defVal)
+{
+	BOOL ok;
+	int val = GetDlgItemInt(hwnd, dlgItem, &ok, FALSE);
+	return ok ? val : defVal;
 }
 
 void OptionsDialog::OnOK(HWND hwnd)
 {
-	BOOL intOk;
-
 	// Read the integers.
-	m_cursorTrans = GetDlgItemInt(hwnd, IDC_CURSOR_TRANS, &intOk, FALSE);
-	if(!intOk)
-		m_cursorTrans = MetalBar::s_cursorColor >> 24;
-	m_barWidth = GetDlgItemInt(hwnd, IDC_BAR_WIDTH, &intOk, FALSE);
-	if(!intOk)
-		m_barWidth = MetalBar::s_barWidth;
+	m_cursorTrans = GetInt(hwnd, IDC_CURSOR_TRANS, MetalBar::s_cursorColor >> 24);
+	m_barWidth = GetInt(hwnd, IDC_BAR_WIDTH, MetalBar::s_barWidth);
+	m_codePreviewWidth = GetInt(hwnd, IDC_PREVIEW_WIDTH, MetalBar::s_codePreviewWidth);
+	m_codePreviewHeight = GetInt(hwnd, IDC_PREVIEW_HEIGHT, MetalBar::s_codePreviewHeight);
 
 	m_requireALT = (IsDlgButtonChecked(hwnd, IDC_REQUIRE_ALT) == BST_CHECKED);
 }
@@ -111,17 +113,7 @@ INT_PTR CALLBACK OptionsDialog::DlgProc(HWND hwnd, UINT msg, WPARAM wparam, LPAR
 
 void OptionsDialog::Execute()
 {
-	CComPtr<EnvDTE::Window> mainWnd;
-	HRESULT hr = g_dte->get_MainWindow(&mainWnd);
-	if(FAILED(hr) || !mainWnd)
-		return;
-
-	long mainWndHandle;
-	hr = mainWnd->get_HWnd(&mainWndHandle);
-	if(FAILED(hr) || !mainWndHandle)
-		return;
-
-	int ret = DialogBoxParamA(_AtlModule.GetResourceInstance(), (LPSTR)IDD_OPTIONS, (HWND)mainWndHandle, DlgProc, (LPARAM)this);
+	int ret = DialogBoxParamA(_AtlModule.GetResourceInstance(), (LPSTR)IDD_OPTIONS, g_mainVSHwnd, DlgProc, (LPARAM)this);
 	if(ret == DlgRet_Cancel)
 		return;
 
@@ -143,7 +135,19 @@ void OptionsDialog::Execute()
 	MetalBar::s_bookmarkColor = m_bookmarks.GetColor();
 	MetalBar::s_cursorColor = (m_cursorColor.GetColor() & 0xffffff) | ((m_cursorTrans & 0xff) << 24);
 	MetalBar::s_barWidth = m_barWidth;
+	MetalBar::s_codePreviewWidth = m_codePreviewWidth;
+	MetalBar::s_codePreviewHeight = m_codePreviewHeight;
 	MetalBar::s_requireAltForHighlight = m_requireALT;
 
 	MetalBar::SaveSettings();
+}
+
+void OptionsDialog::Init()
+{
+	ColorChip::Register();
+}
+
+void OptionsDialog::Uninit()
+{
+	ColorChip::Unregister();
 }

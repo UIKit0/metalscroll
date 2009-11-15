@@ -17,6 +17,7 @@
 #include "MetalScrollPCH.h"
 #include "MetalScrollPackage.h"
 #include "MarkerGUID.h"
+#include "Utils.h"
 
 // {454DB430-837D-4435-B7C1-F503B93EDA04} is the GUID for the marker service we register in CMetalScrollPackage.rgs.
 const GUID g_markerServGUID = { 0x454DB430, 0x837D, 0x4435, { 0xB7, 0xC1, 0xF5, 0x03, 0xB9, 0x3E, 0xDA, 0x04 } };

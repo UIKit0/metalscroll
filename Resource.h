@@ -21,6 +21,8 @@
 #define IDC_RESET                       212
 #define IDC_BOOKMARKS                   213
 #define IDC_REQUIRE_ALT                 214
+#define IDC_PREVIEW_WIDTH               215
+#define IDC_PREVIEW_HEIGHT              216
 
 // Next default values for new objects
 // 

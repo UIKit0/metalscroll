@@ -253,6 +253,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\CodePreview.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\ColorChip.cpp"
 				>
 			</File>
@@ -262,10 +266,6 @@
 			</File>
 			<File
 				RelativePath=".\EditCmdFilter.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\ImageScaling.cpp"
 				>
 			</File>
 			<File
@@ -300,12 +300,20 @@
 				RelativePath=".\OptionsDialog.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\Utils.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath=".\CodePreview.h"
+				>
+			</File>
 			<File
 				RelativePath=".\ColorChip.h"
 				>
@@ -316,10 +324,6 @@
 			</File>
 			<File
 				RelativePath=".\EditCmdFilter.h"
-				>
-			</File>
-			<File
-				RelativePath=".\ImageScaling.h"
 				>
 			</File>
 			<File
@@ -344,6 +348,10 @@
 			</File>
 			<File
 				RelativePath=".\Resource.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Utils.h"
 				>
 			</File>
 		</Filter>

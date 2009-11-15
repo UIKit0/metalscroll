@@ -84,9 +84,6 @@ private:
 	HINSTANCE m_hInstance;
 };
 
-#define RGB_TO_COLORREF(rgb) ((rgb & 0xff00) | ((rgb & 0xff) << 16) | ((rgb & 0xff0000) >> 16))
-#define COLORREF_TO_RGB(cr) ((cr & 0xff00) | ((cr & 0xff) << 16) | ((cr & 0xff0000) >> 16) | 0xff000000)
-
 extern CAddInModule _AtlModule;
 
 #include <assert.h>
@@ -97,20 +94,3 @@ extern CAddInModule _AtlModule;
 #include <intrin.h>
 #include <xmmintrin.h>
 #include <emmintrin.h>
-
-#define ENABLE_LOGGING			1
-
-static inline void Log(const char* fmt, ...)
-{
-#if ENABLE_LOGGING
-	char buf[256];
-	va_list ap;
-	va_start(ap, fmt);
-	_vsnprintf(buf, sizeof(buf), fmt, ap);
-	buf[sizeof(buf)-1] = 0;
-	va_end(ap);
-	OutputDebugStringA(buf);
-#else
-	fmt;
-#endif
-}
