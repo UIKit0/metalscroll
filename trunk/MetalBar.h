@@ -28,11 +28,10 @@ public:
 	HWND							GetHwnd() const { return m_hwnd; }
 	LRESULT							WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
+	static void						Init();
+	static void						Uninit();
 	static void						ResetSettings();
-	static void						ReadSettings();
 	static void						SaveSettings();
-
-	static void						RemoveAllBars();
 
 	// User-controllable parameters.
 	static unsigned int				s_barWidth;
@@ -47,6 +46,8 @@ public:
 	static unsigned int				s_breakpointColor;
 	static unsigned int				s_bookmarkColor;
 	static unsigned int				s_requireAltForHighlight;
+	static unsigned int				s_codePreviewWidth;
+	static unsigned int				s_codePreviewHeight;
 
 private:
 	enum LineMarker
@@ -82,15 +83,17 @@ private:
 	};
 
 	static std::set<MetalBar*>		s_bars;
+
 	static bool						ReadRegInt(unsigned int* to, HKEY key, const char* name);
 	static void						WriteRegInt(HKEY key, const char* name, unsigned int val);
+	static void						ReadSettings();
+	static void						RemoveAllBars();
 
 	// Handles and other window-related stuff.
 	WNDPROC							m_oldProc;
 	HWND							m_hwnd;
 	HWND							m_editorWnd;
 	HWND							m_horizBar;
-	HWND							m_tooltipWnd;
 
 	// Text.
 	IVsTextView*					m_view;
@@ -114,15 +117,13 @@ private:
 	int								m_scrollMin;
 	int								m_scrollMax;
 	bool							m_dragging;
-	bool							m_tooltipShown;
 
-	void							InitTooltip();
 	bool							GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
 	bool							GetFileName(CComBSTR& name, IVsTextLines* buffer);
 	void							ProcessLineMarkers(IVsTextLines* buffer, int type, const MarkerOperator& op);
 
 	void							OnDrag(bool initial);
-	void							OnTrackTooltip();
+	void							OnTrackPreview();
 	void							OnPaint(HDC ctrlDC);
 	void							AdjustSize(unsigned int requiredWidth);
 	void							RemoveWndProcHook();

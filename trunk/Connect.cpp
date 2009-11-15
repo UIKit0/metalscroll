@@ -17,9 +17,8 @@
 #include "MetalScrollPCH.h"
 #include "Connect.h"
 #include "MetalBar.h"
-#include "ColorChip.h"
 #include "MarkerGUID.h"
-#include "ImageScaling.h"
+#include "Utils.h"
 
 extern CAddInModule _AtlModule;
 
@@ -27,6 +26,7 @@ CComPtr<EnvDTE80::DTE2>				g_dte;
 CComPtr<EnvDTE::AddIn>				g_addInInstance;
 CComPtr<IVsTextManager>				g_textMgr;
 long								g_highlightMarkerType;
+HWND								g_mainVSHwnd = 0;
 
 CConnect::CConnect()
 {
@@ -55,8 +55,6 @@ bool CConnect::GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* vie
 
 STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*connectMode*/, IDispatch* addInInst, SAFEARRAY** /*custom*/)
 {
-	InitScaler();
-
 	Log("MetalScroll: OnConnection()\n");
 
 	HRESULT hr = application->QueryInterface(__uuidof(EnvDTE80::DTE2), (void**)&g_dte);
@@ -90,8 +88,25 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 		g_highlightMarkerType = 0;
 	}
 
-	MetalBar::ReadSettings();
-	ColorChip::Register();
+	CComPtr<EnvDTE::Window> mainWnd;
+	hr = g_dte->get_MainWindow(&mainWnd);
+	if(FAILED(hr) || !mainWnd)
+	{
+		Log("MetalScroll: Can't get main VS window.\n");
+		return E_NOINTERFACE;
+	}
+
+	long mainWndHandle;
+	hr = mainWnd->get_HWnd(&mainWndHandle);
+	if(FAILED(hr) || !mainWndHandle)
+	{
+		Log("MetalScroll: Can't get main VS window handle.\n");
+		return E_NOINTERFACE;
+	}
+
+	g_mainVSHwnd = (HWND)mainWndHandle;
+
+	MetalBar::Init();
 
 	Log("MetalScroll: OnConnection() done.\n");
 	return S_OK;
@@ -106,8 +121,7 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 		m_textMgrEventsCookie = 0;
 	}
 
-	MetalBar::RemoveAllBars();
-	ColorChip::Unregister();
+	MetalBar::Uninit();
 
 	// Give up the global pointers.
 	g_textMgr = 0;

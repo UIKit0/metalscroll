@@ -16,5 +16,17 @@
 
 #pragma once
 
+#define RGB_TO_COLORREF(rgb) ((rgb & 0xff00) | ((rgb & 0xff) << 16) | ((rgb & 0xff0000) >> 16))
+#define COLORREF_TO_RGB(cr) ((cr & 0xff00) | ((cr & 0xff) << 16) | ((cr & 0xff0000) >> 16) | 0xff000000)
+
+template<typename T> static inline int clamp(const T& x, const T& min, const T& max)
+{
+	return (x < min) ? min : ((x > max) ? max : x);
+}
+
 void InitScaler();
 void ScaleImageVertically(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width);
+
+void Log(const char* fmt, ...);
+
+void FillSolidRect(HDC hdc, unsigned int color, const RECT& r);

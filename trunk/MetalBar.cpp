@@ -18,7 +18,8 @@
 #include "MetalBar.h"
 #include "OptionsDialog.h"
 #include "EditCmdFilter.h"
-#include "ImageScaling.h"
+#include "Utils.h"
+#include "CodePreview.h"
 
 #define REFRESH_CODE_TIMER_ID		1
 #define REFRESH_CODE_INTERVAL		2000
@@ -26,6 +27,7 @@
 extern CComPtr<EnvDTE80::DTE2>		g_dte;
 extern CComPtr<IVsTextManager>		g_textMgr;
 extern long							g_highlightMarkerType;
+extern HWND							g_mainVSHwnd;
 
 unsigned int MetalBar::s_barWidth;
 unsigned int MetalBar::s_whitespaceColor;
@@ -39,8 +41,13 @@ unsigned int MetalBar::s_unsavedLineColor;
 unsigned int MetalBar::s_breakpointColor;
 unsigned int MetalBar::s_bookmarkColor;
 unsigned int MetalBar::s_requireAltForHighlight;
+unsigned int MetalBar::s_codePreviewWidth;
+unsigned int MetalBar::s_codePreviewHeight;
 
 std::set<MetalBar*> MetalBar::s_bars;
+
+static CodePreview					g_codePreviewWnd;
+static bool							g_previewShown = false;
 
 MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IVsTextView* view)
 {
@@ -73,8 +80,6 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 
 	s_bars.insert(this);
 	AdjustSize(s_barWidth);
-
-	InitTooltip();
 }
 
 MetalBar::~MetalBar()
@@ -97,34 +102,10 @@ MetalBar::~MetalBar()
 		DeleteObject(m_backBufferDC);
 }
 
-void MetalBar::InitTooltip()
-{
-	DWORD style = WS_POPUP | TTS_ALWAYSTIP | TTS_BALLOON | TTS_NOPREFIX | TTS_NOANIMATE | TTS_NOFADE;
-	m_tooltipWnd = CreateWindowEx(0, TOOLTIPS_CLASS, 0, style, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, m_hwnd, 0, _AtlModule.GetResourceInstance(), 0);
-
-	TOOLINFO toolInfo;
-	memset(&toolInfo, 0, sizeof(toolInfo));
-	toolInfo.cbSize = sizeof(toolInfo);
-	toolInfo.hwnd = m_hwnd;
-	toolInfo.uFlags = TTF_IDISHWND | TTF_TRACK;
-	toolInfo.uId = (UINT_PTR)m_hwnd;
-	toolInfo.lpszText = L"nothing";
-	SendMessage(m_tooltipWnd, TTM_ADDTOOL, 0, (LPARAM)&toolInfo);
-	SendMessage(m_tooltipWnd, TTM_SETMAXTIPWIDTH, 0, 1024);
-
-	m_tooltipShown = false;
-}
-
 void MetalBar::RemoveWndProcHook()
 {
 	SetWindowLongPtr(m_hwnd, GWL_USERDATA, 0);
 	SetWindowLongPtr(m_hwnd, GWL_WNDPROC, (::LONG_PTR)m_oldProc);
-
-	if(m_tooltipWnd)
-	{
-		DestroyWindow(m_tooltipWnd);
-		m_tooltipWnd = 0;
-	}
 }
 
 void MetalBar::RemoveAllBars()
@@ -201,12 +182,7 @@ void MetalBar::OnDrag(bool initial)
 		PostMessage(parent, WM_VSCROLL, SB_ENDSCROLL, (LPARAM)m_hwnd);
 }
 
-static int clamp(int x, int m, int M)
-{
-	return (x < m) ? m : ((x > M) ? M : x);
-}
-
-void MetalBar::OnTrackTooltip()
+void MetalBar::OnTrackPreview()
 {
 	POINT mouse;
 	GetCursorPos(&mouse);
@@ -214,15 +190,10 @@ void MetalBar::OnTrackTooltip()
 	RECT clRect;
 	GetWindowRect(m_hwnd, &clRect);
 
+	// Determine the line, taking care of the case when the code image is scaled.
 	int codeImgHeight = std::min((int)m_backBufferHeight, (int)m_numLines);
-	int line = clamp(mouse.y - clRect.top, 0, codeImgHeight);
+	int line = clamp<int>(mouse.y - clRect.top, 0, codeImgHeight);
 
-	// Move the tooltip.
-	mouse.x = clamp(mouse.x, clRect.left, clRect.right);
-	mouse.y = line + clRect.top;
-	SendMessage(m_tooltipWnd, TTM_TRACKPOSITION, 0, MAKELPARAM(mouse.x, mouse.y));
-
-	// Determine the line if the code image is scaled.
 	if((int)m_backBufferHeight < m_numLines)
 		line = int(1.0f * line * m_numLines / m_backBufferHeight);
 	
@@ -243,12 +214,7 @@ void MetalBar::OnTrackTooltip()
 	if(FAILED(hr) || !text)
 		return;
 
-	TOOLINFO ti = { 0 };
-	ti.cbSize = sizeof(ti);
-	ti.hwnd = m_hwnd;
-	ti.uId = (UINT_PTR)m_hwnd;
-	ti.lpszText = text;
-	SendMessage(m_tooltipWnd, TTM_UPDATETIPTEXT, 0, (LPARAM)&ti);
+	g_codePreviewWnd.Update(mouse.y, text);
 }
 
 LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -358,8 +324,8 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			if(m_dragging)
 				OnDrag(false);
 
-			if(m_tooltipShown)
-				OnTrackTooltip();
+			if(g_previewShown)
+				OnTrackPreview();
 
 			return 0;
 		}
@@ -384,27 +350,20 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		case WM_MBUTTONDOWN:
 		{
 			SetCapture(m_hwnd);
-			m_tooltipShown = true;
-			TOOLINFO ti;
-			ti.cbSize = sizeof(ti);
-			ti.hwnd = m_hwnd;
-			ti.uId = (UINT_PTR)m_hwnd;
-			SendMessage(m_tooltipWnd, TTM_TRACKACTIVATE, TRUE, (LPARAM)&ti);
-			OnTrackTooltip();
+			g_previewShown = true;
+			OnTrackPreview();
+			g_codePreviewWnd.Show(m_hwnd);
 			return 0;
 		}
 
 		case WM_MBUTTONUP:
 		{
-			if(!m_tooltipShown)
+			if(!g_previewShown)
 				return 0;
 
 			ReleaseCapture();
-			TOOLINFO ti;
-			ti.cbSize = sizeof(ti);
-			ti.hwnd = m_hwnd;
-			ti.uId = (UINT_PTR)m_hwnd;
-			SendMessage(m_tooltipWnd, TTM_TRACKACTIVATE, FALSE, (LPARAM)&ti);
+			g_previewShown = false;
+			g_codePreviewWnd.Hide();
 			return 0;
 		}
 
@@ -990,15 +949,9 @@ void MetalBar::OnPaint(HDC ctrlDC)
 
 	// Blit the code image and fill the remaining space with the whitespace color.
 	BitBlt(m_backBufferDC, clRect.left, clRect.top, s_barWidth, m_codeImgHeight, m_imgDC, 0, 0, SRCCOPY);
-	COLORREF oldColor = SetBkColor(m_backBufferDC, RGB_TO_COLORREF(s_whitespaceColor));
-	RECT remainingRect;
-	remainingRect.left = clRect.left;
-	remainingRect.right = clRect.right;
-	remainingRect.top = clRect.top + m_codeImgHeight;
-	remainingRect.bottom = clRect.bottom;
-	// Wondrous hack (c) MFC: fill a rect with ExtTextOut(), since it doesn't require us to create a brush.
-	ExtTextOut(m_backBufferDC, 0, 0, ETO_OPAQUE, &remainingRect, NULL, 0, NULL);
-	SetBkColor(m_backBufferDC, oldColor);
+	RECT remainingRect = clRect;
+	remainingRect.top += m_codeImgHeight;
+	FillSolidRect(m_backBufferDC, s_whitespaceColor, remainingRect);
 
 	// Compute the size and position of the current page marker.
 	int range = m_scrollMax - m_scrollMin - m_pageSize + 2;
@@ -1049,6 +1002,8 @@ void MetalBar::ResetSettings()
 	s_breakpointColor = 0xffff0000;
 	s_bookmarkColor = 0xff0000ff;
 	s_requireAltForHighlight = TRUE;
+	s_codePreviewWidth = 250;
+	s_codePreviewHeight = 130;
 }
 
 bool MetalBar::ReadRegInt(unsigned int* to, HKEY key, const char* name)
@@ -1087,6 +1042,8 @@ void MetalBar::ReadSettings()
 	ReadRegInt(&s_breakpointColor, key, "BreakpointColor");
 	ReadRegInt(&s_bookmarkColor, key, "BookmarkColor");
 	ReadRegInt(&s_requireAltForHighlight, key, "RequireALT");
+	ReadRegInt(&s_codePreviewWidth, key, "CodePreviewWidth");
+	ReadRegInt(&s_codePreviewHeight, key, "CodePreviewHeight");
 
 	RegCloseKey(key);
 }
@@ -1114,6 +1071,8 @@ void MetalBar::SaveSettings()
 	WriteRegInt(key, "BreakpointColor", s_breakpointColor);
 	WriteRegInt(key, "BookmarkColor", s_bookmarkColor);
 	WriteRegInt(key, "RequireALT", s_requireAltForHighlight);
+	WriteRegInt(key, "CodePreviewWidth", s_codePreviewWidth);
+	WriteRegInt(key, "CodePreviewHeight", s_codePreviewHeight);
 
 	RegCloseKey(key);
 
@@ -1125,6 +1084,9 @@ void MetalBar::SaveSettings()
 		bar->AdjustSize(s_barWidth);
 		InvalidateRect(bar->m_hwnd, 0, 0);
 	}
+
+	// Resize the code preview window.
+	g_codePreviewWnd.Resize(s_codePreviewWidth, s_codePreviewHeight);
 }
 
 void MetalBar::RemoveWordHighlight(IVsTextLines* buffer)
@@ -1201,4 +1163,24 @@ void MetalBar::HighlightMatchingWords()
 
 		++column;
 	}
+}
+
+void MetalBar::Init()
+{
+	ReadSettings();
+
+	InitScaler();
+	CodePreview::Register();
+	OptionsDialog::Init();
+
+	g_codePreviewWnd.Create(g_mainVSHwnd, s_codePreviewWidth, s_codePreviewHeight);
+}
+
+void MetalBar::Uninit()
+{
+	g_codePreviewWnd.Destroy();
+
+	RemoveAllBars();
+	CodePreview::Unregister();
+	OptionsDialog::Uninit();
 }

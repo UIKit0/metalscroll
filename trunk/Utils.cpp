@@ -15,6 +15,7 @@
 */
 
 #include "MetalScrollPCH.h"
+#include "Utils.h"
 
 static bool g_hasSSE2 = false;
 
@@ -169,4 +170,23 @@ void InitScaler()
 	int info[4];
 	__cpuid(info, 1);
 	g_hasSSE2 = (info[3] & (1 << 26)) != 0;
+}
+
+void Log(const char* fmt, ...)
+{
+	char buf[256];
+	va_list ap;
+	va_start(ap, fmt);
+	_vsnprintf(buf, sizeof(buf), fmt, ap);
+	buf[sizeof(buf)-1] = 0;
+	va_end(ap);
+	OutputDebugStringA(buf);
+}
+
+void FillSolidRect(HDC hdc, unsigned int color, const RECT& r)
+{
+	// Wondrous hack (c) MFC: fill a rect with ExtTextOut(), since it doesn't require us to create a brush.
+	COLORREF oldColor = SetBkColor(hdc, RGB_TO_COLORREF(color));
+	ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &r, NULL, 0, NULL);
+	SetBkColor(hdc, oldColor);
 }
