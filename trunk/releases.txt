@@ -1,3 +1,10 @@
+ Version 1.0.6 (revision 52)
+-----------------------------
+  - the scrollbar only colors C-style comments in C-like language files (i.e. C, C++ and C#)
+  - the middle click preview only applies syntax highlighting for C-like language files
+  - words highlighted by (alt-)double-click are also marked in the middle-click preview window
+  - fixed: some words were mistakenly highlighted as C++ keywords in the middle click preview 
+ 
  Version 1.0.5 (revision 50)
 -----------------------------
   - holding down ALT for double-click highlighting is optional
