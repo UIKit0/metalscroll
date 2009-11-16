@@ -18,6 +18,7 @@
 #include "CodePreview.h"
 #include "Utils.h"
 #include "MetalBar.h"
+#include "CppLexer.h"
 
 #define HORIZ_MARGIN		10
 #define VERT_MARGIN			10
@@ -263,11 +264,10 @@ wchar_t* CodePreview::EatIdentifier(wchar_t* text, int* x)
 	chr = eatFunc(chr, &textX);															\
 	ExtTextOutW(m_paintDC, startX, textY + r.top, ETO_CLIPPED, &r, start, chr - start, 0)
 
-extern const wchar_t* IsCppKeyword(const wchar_t* str, unsigned int len);
-
-void CodePreview::Update(int y, wchar_t* text, int tabSize)
+void CodePreview::Update(int y, wchar_t* text, int tabSize, const wchar_t* highlightWord, bool doSyntaxHighlight)
 {
 	m_tabSize = tabSize * s_charWidth;
+	unsigned int highlightWordLen = highlightWord ? wcslen(highlightWord) : 0;
 
 	if(!m_paintDC)
 	{
@@ -304,34 +304,52 @@ void CodePreview::Update(int y, wchar_t* text, int tabSize)
 		if(chr[0] == 0)
 			break;
 
-		if(chr[0] == L'"')
+		if( highlightWordLen && !wcsncmp(chr, highlightWord, highlightWordLen) && (chr == text || IsCppIdSeparator(chr[-1])) && IsCppIdSeparator(chr[highlightWordLen]) )
 		{
-			DRAW_ITEM(EatString);
-			continue;
-		}
+			// Draw highlighted words in "inverse video".
+			RECT wordRect = { textX + r.left, textY + r.top, textX + highlightWordLen*s_charWidth + r.top, textY + s_lineHeight + r.top };
+			FillSolidRect(m_paintDC, MetalBar::s_codePreviewFg, wordRect);
 
-		if( (chr[0] == L'/') && (chr[1] == L'/') )
-		{
-			SetTextColor(m_paintDC, RGB_TO_COLORREF(MetalBar::s_commentColor));
-			DRAW_ITEM(EatComment);
+			SetTextColor(m_paintDC, RGB_TO_COLORREF(MetalBar::s_codePreviewBg));
+			ExtTextOutW(m_paintDC, wordRect.left, wordRect.top, ETO_CLIPPED, &r, chr, highlightWordLen, 0);
 			SetTextColor(m_paintDC, RGB_TO_COLORREF(MetalBar::s_codePreviewFg));
+
+			chr += highlightWordLen;
+			textX += highlightWordLen*s_charWidth;
 			continue;
 		}
 
-		if( (chr[0] == L'_') || ((chr[0] >= L'A') && (chr[0] <= L'Z')) || ((chr[0] >= L'a') && (chr[0] <= L'z')) )
+		if(doSyntaxHighlight)
 		{
-			wchar_t* start = chr;
-			int startX = textX + r.left;
-			int startY = textY + r.top;
-			chr = EatIdentifier(chr, &textX);
-			int idLen = (int)(chr - start);
-			bool isKeyword = (IsCppKeyword(start, idLen) != 0);
-			if(isKeyword)
-				SelectObject(m_paintDC, s_boldFont);
-			ExtTextOutW(m_paintDC, startX, startY, ETO_CLIPPED, &r, start, idLen, 0);
-			if(isKeyword)
-				SelectObject(m_paintDC, s_normalFont);
-			continue;
+			if(chr[0] == L'"')
+			{
+				DRAW_ITEM(EatString);
+				continue;
+			}
+
+			if( (chr[0] == L'/') && (chr[1] == L'/') )
+			{
+				SetTextColor(m_paintDC, RGB_TO_COLORREF(MetalBar::s_commentColor));
+				DRAW_ITEM(EatComment);
+				SetTextColor(m_paintDC, RGB_TO_COLORREF(MetalBar::s_codePreviewFg));
+				continue;
+			}
+
+			if( (chr[0] == L'_') || ((chr[0] >= L'A') && (chr[0] <= L'Z')) || ((chr[0] >= L'a') && (chr[0] <= L'z')) )
+			{
+				wchar_t* start = chr;
+				int startX = textX + r.left;
+				int startY = textY + r.top;
+				chr = EatIdentifier(chr, &textX);
+				int idLen = (int)(chr - start);
+				bool isKeyword = (IsCppKeyword(start, idLen) != 0);
+				if(isKeyword)
+					SelectObject(m_paintDC, s_boldFont);
+				ExtTextOutW(m_paintDC, startX, startY, ETO_CLIPPED, &r, start, idLen, 0);
+				if(isKeyword)
+					SelectObject(m_paintDC, s_normalFont);
+				continue;
+			}
 		}
 
 		ExtTextOutW(m_paintDC, textX + r.left, textY + r.top, ETO_CLIPPED, &r, chr, 1, 0);

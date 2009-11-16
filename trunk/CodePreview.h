@@ -29,7 +29,7 @@ public:
 
 	void						Show(HWND bar);
 	void						Hide();
-	void						Update(int y, wchar_t* text, int tabSize);
+	void						Update(int y, wchar_t* text, int tabSize, const wchar_t* highlightWord, bool doSyntaxHighlight);
 	void						Resize(int width, int height);
 
 private:

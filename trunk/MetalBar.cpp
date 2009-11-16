@@ -20,6 +20,7 @@
 #include "EditCmdFilter.h"
 #include "Utils.h"
 #include "CodePreview.h"
+#include "CppLexer.h"
 
 #define REFRESH_CODE_TIMER_ID		1
 #define REFRESH_CODE_INTERVAL		2000
@@ -50,6 +51,8 @@ std::set<MetalBar*> MetalBar::s_bars;
 
 static CodePreview					g_codePreviewWnd;
 static bool							g_previewShown = false;
+static const GUID					g_cppLangGUID		= { 0xB2F072B0, 0xABC1, 0x11D0, { 0x9D, 0x62, 0x00, 0xC0, 0x4F, 0xD9, 0xDF, 0xD9 } };
+static const GUID					g_csharpLangGUID	= { 0x694DD9B6, 0xB865, 0x4C5B, { 0xAD, 0x85, 0x86, 0x35, 0x6E, 0x9C, 0x88, 0xDC } };
 
 MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IVsTextView* view)
 {
@@ -220,7 +223,7 @@ void MetalBar::OnTrackPreview()
 	if(FAILED(hr) || !text)
 		return;
 
-	g_codePreviewWnd.Update(clRect.top + clampedY, text, m_tabSize);
+	g_codePreviewWnd.Update(clRect.top + clampedY, text, m_tabSize, m_highlightWord, m_isCppLikeLanguage);
 }
 
 LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -732,7 +735,10 @@ void MetalBar::RenderCodeImg(int barHeight)
 
 	LANGPREFERENCES langPrefs;
 	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
+	{
 		m_tabSize = langPrefs.uTabSize;
+		m_isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID);
+	}
 	else
 		m_tabSize = 4;
 
@@ -800,12 +806,12 @@ void MetalBar::RenderCodeImg(int barHeight)
 			switch(commentType)
 			{
 				case CommentType_None:
-					if( (chr[0] == L'/') && (chr[1] == L'/') )
+					if( m_isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'/') )
 					{
 						color = s_commentColor;
 						commentType = CommentType_SingleLine;
 					}
-					else if( (chr[0] == L'/') && (chr[1] == L'*') )
+					else if( m_isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'*') )
 					{
 						color = s_commentColor;
 						commentType = CommentType_MultiLine;
@@ -1111,23 +1117,7 @@ void MetalBar::RemoveWordHighlight(IVsTextLines* buffer)
 	};
 
 	ProcessLineMarkers(buffer, g_highlightMarkerType, DeleteMarkerOp());
-}
-
-static bool IsSeparator(wchar_t chr)
-{
-	if( (chr >= L'0') && (chr <= L'9') )
-		return false;
-
-	if( (chr >= L'A') && (chr <= L'Z') )
-		return false;
-
-	if( (chr >= L'a') && (chr <= L'z') )
-		return false;
-
-	if(chr == L'_')
-		return false;
-
-	return true;
+	m_highlightWord = (wchar_t*)0;
 }
 
 void MetalBar::HighlightMatchingWords()
@@ -1140,14 +1130,19 @@ void MetalBar::HighlightMatchingWords()
 
 	RemoveWordHighlight(buffer);
 
-	CComBSTR selText;
-	HRESULT hr = m_view->GetSelectedText(&selText);
-	if(FAILED(hr) || !selText)
+	HRESULT hr = m_view->GetSelectedText(&m_highlightWord);
+	if(FAILED(hr) || !m_highlightWord)
+	{
+		m_highlightWord = (wchar_t*)0;
 		return;
+	}
 
-	unsigned int selTextLen = selText.Length();
+	unsigned int selTextLen = m_highlightWord.Length();
 	if(selTextLen < 1)
+	{
+		m_highlightWord = (wchar_t*)0;
 		return;
+	}
 
 	int line = 0;
 	int column = 0;
@@ -1164,7 +1159,7 @@ void MetalBar::HighlightMatchingWords()
 			continue;
 		}
 
-		if( (wcsncmp(chr, selText, selTextLen) == 0) && (chr == allText || IsSeparator(chr[-1])) && IsSeparator(chr[selTextLen]) )
+		if( (wcsncmp(chr, m_highlightWord, selTextLen) == 0) && (chr == allText || IsCppIdSeparator(chr[-1])) && IsCppIdSeparator(chr[selTextLen]) )
 		{
 			buffer->CreateLineMarker(g_highlightMarkerType, line, column, line, column + selTextLen, 0, 0);
 			// Make sure we don't create overlapping markers.
