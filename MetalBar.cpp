@@ -41,6 +41,8 @@ unsigned int MetalBar::s_unsavedLineColor;
 unsigned int MetalBar::s_breakpointColor;
 unsigned int MetalBar::s_bookmarkColor;
 unsigned int MetalBar::s_requireAltForHighlight;
+unsigned int MetalBar::s_codePreviewBg;
+unsigned int MetalBar::s_codePreviewFg;
 unsigned int MetalBar::s_codePreviewWidth;
 unsigned int MetalBar::s_codePreviewHeight;
 
@@ -69,6 +71,7 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 	m_backBufferBits = 0;
 	m_backBufferWidth = 0;
 	m_backBufferHeight = 0;
+	m_tabSize = 4;
 
 	m_pageSize = 1;
 	m_scrollPos = 0;
@@ -192,10 +195,13 @@ void MetalBar::OnTrackPreview()
 
 	// Determine the line, taking care of the case when the code image is scaled.
 	int codeImgHeight = std::min((int)m_backBufferHeight, (int)m_numLines);
-	int line = clamp<int>(mouse.y - clRect.top, 0, codeImgHeight);
+	int clampedY = clamp<int>(mouse.y - clRect.top, 0, codeImgHeight);
 
+	int line;
 	if((int)m_backBufferHeight < m_numLines)
-		line = int(1.0f * line * m_numLines / m_backBufferHeight);
+		line = int(1.0f * clampedY * m_numLines / m_backBufferHeight);
+	else
+		line = clampedY;
 	
 	CComPtr<IVsTextLines> buffer;
 	HRESULT hr = m_view->GetBuffer(&buffer);
@@ -208,13 +214,13 @@ void MetalBar::OnTrackPreview()
 		return;
 
 	CComBSTR text;
-	int minLine = std::max(0, line - 10);
-	int maxLine = std::min((int)numLines - 1, line + 10);
+	int minLine = std::max<int>(0, line - s_codePreviewHeight / 2);
+	int maxLine = std::min<int>((int)numLines - 1, minLine + s_codePreviewHeight);
 	hr = buffer->GetLineText(minLine, 0, maxLine, 0, &text);
 	if(FAILED(hr) || !text)
 		return;
 
-	g_codePreviewWnd.Update(mouse.y, text);
+	g_codePreviewWnd.Update(clRect.top + clampedY, text, m_tabSize);
 }
 
 LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -724,12 +730,11 @@ void MetalBar::RenderCodeImg(int barHeight)
 	if(!GetBufferAndText(&buffer, &text, &m_numLines))
 		return;
 
-	unsigned int tabSize;
 	LANGPREFERENCES langPrefs;
 	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
-		tabSize = langPrefs.uTabSize;
+		m_tabSize = langPrefs.uTabSize;
 	else
-		tabSize = 4;
+		m_tabSize = 4;
 
 	if(m_numLines < 1)
 		m_numLines = 1;
@@ -842,7 +847,7 @@ void MetalBar::RenderCodeImg(int barHeight)
 		{
 			color = s_whitespaceColor;
 			if(*chr == L'\t')
-				numChars = (int)tabSize;
+				numChars = (int)m_tabSize;
 
 			// Tabs count as a single character for the column tracking.
 			++currentTextColumn;
@@ -1002,8 +1007,10 @@ void MetalBar::ResetSettings()
 	s_breakpointColor = 0xffff0000;
 	s_bookmarkColor = 0xff0000ff;
 	s_requireAltForHighlight = TRUE;
-	s_codePreviewWidth = 250;
-	s_codePreviewHeight = 130;
+	s_codePreviewBg = 0xffffffe1;
+	s_codePreviewFg = 0xff000000;
+	s_codePreviewWidth = 80;
+	s_codePreviewHeight = 15;
 }
 
 bool MetalBar::ReadRegInt(unsigned int* to, HKEY key, const char* name)
@@ -1042,6 +1049,8 @@ void MetalBar::ReadSettings()
 	ReadRegInt(&s_breakpointColor, key, "BreakpointColor");
 	ReadRegInt(&s_bookmarkColor, key, "BookmarkColor");
 	ReadRegInt(&s_requireAltForHighlight, key, "RequireALT");
+	ReadRegInt(&s_codePreviewFg, key, "CodePreviewFg");
+	ReadRegInt(&s_codePreviewBg, key, "CodePreviewBg");
 	ReadRegInt(&s_codePreviewWidth, key, "CodePreviewWidth");
 	ReadRegInt(&s_codePreviewHeight, key, "CodePreviewHeight");
 
@@ -1071,6 +1080,8 @@ void MetalBar::SaveSettings()
 	WriteRegInt(key, "BreakpointColor", s_breakpointColor);
 	WriteRegInt(key, "BookmarkColor", s_bookmarkColor);
 	WriteRegInt(key, "RequireALT", s_requireAltForHighlight);
+	WriteRegInt(key, "CodePreviewFg", s_codePreviewFg);
+	WriteRegInt(key, "CodePreviewBg", s_codePreviewBg);
 	WriteRegInt(key, "CodePreviewWidth", s_codePreviewWidth);
 	WriteRegInt(key, "CodePreviewHeight", s_codePreviewHeight);
 

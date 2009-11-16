@@ -23,6 +23,8 @@
 #define IDC_REQUIRE_ALT                 214
 #define IDC_PREVIEW_WIDTH               215
 #define IDC_PREVIEW_HEIGHT              216
+#define IDC_PREVIEW_BG                  217
+#define IDC_PREVIEW_FG                  218
 
 // Next default values for new objects
 // 

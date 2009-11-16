@@ -16,6 +16,7 @@
 
 #include "MetalScrollPCH.h"
 #include "ColorChip.h"
+#include "Utils.h"
 
 const char ColorChip::s_className[] = "MetalScrollChip";
 
@@ -158,18 +159,13 @@ void ColorChip::OnPaint(HWND hwnd, HDC dc)
 	RECT clRect;
 	GetClientRect(hwnd, &clRect);
 
-	HGDIOBJ prevPen = SelectObject(dc, GetStockObject(BLACK_PEN));
-	Rectangle(dc, clRect.left, clRect.top, clRect.right, clRect.bottom);
-	SelectObject(dc, prevPen);
+	StrokeRect(dc, 0, clRect);
 
 	clRect.left += 1;
 	clRect.right -= 1;
 	clRect.top += 1;
 	clRect.bottom -= 1;
-
-	COLORREF prevColor = SetBkColor(dc, RGB_TO_COLORREF(m_color));
-	ExtTextOut(dc, 0, 0, ETO_OPAQUE, &clRect, NULL, 0, NULL);
-	SetBkColor(dc, prevColor);
+	FillSolidRect(dc, m_color, clRect);
 }
 
 void ColorChip::GetTooltipText(char* text, size_t maxLen)

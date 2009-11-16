@@ -190,3 +190,22 @@ void FillSolidRect(HDC hdc, unsigned int color, const RECT& r)
 	ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &r, NULL, 0, NULL);
 	SetBkColor(hdc, oldColor);
 }
+
+void StrokeRect(HDC hdc, unsigned int color, const RECT& r)
+{
+	COLORREF oldColor = SetBkColor(hdc, RGB_TO_COLORREF(color));
+
+	RECT r1 = { r.left, r.top, r.right, r.top + 1 };
+	ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &r1, NULL, 0, NULL);
+
+	RECT r2 = { r.right - 1, r.top, r.right, r.bottom };
+	ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &r2, NULL, 0, NULL);
+
+	RECT r3 = { r.left, r.bottom - 1, r.right, r.bottom };
+	ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &r3, NULL, 0, NULL);
+
+	RECT r4 = { r.left, r.top, r.left + 1, r.bottom };
+	ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &r4, NULL, 0, NULL);
+
+	SetBkColor(hdc, oldColor);
+}

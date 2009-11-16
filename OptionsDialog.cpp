@@ -35,6 +35,8 @@ void OptionsDialog::InitDialog(HWND hwnd)
 	m_breakpoints.Init(GetDlgItem(hwnd, IDC_BREAKPOINTS), MetalBar::s_breakpointColor);
 	m_bookmarks.Init(GetDlgItem(hwnd, IDC_BOOKMARKS), MetalBar::s_bookmarkColor);
 	m_cursorColor.Init(GetDlgItem(hwnd, IDC_CURSOR_COLOR), MetalBar::s_cursorColor);
+	m_previewBg.Init(GetDlgItem(hwnd, IDC_PREVIEW_BG), MetalBar::s_codePreviewBg);
+	m_previewFg.Init(GetDlgItem(hwnd, IDC_PREVIEW_FG), MetalBar::s_codePreviewFg);
 
 	int cursorTrans = MetalBar::s_cursorColor >> 24;
 	SetDlgItemInt(hwnd, IDC_CURSOR_TRANS, cursorTrans, FALSE);
@@ -133,6 +135,8 @@ void OptionsDialog::Execute()
 	MetalBar::s_unsavedLineColor = m_modifLineUnsaved.GetColor();
 	MetalBar::s_breakpointColor = m_breakpoints.GetColor();
 	MetalBar::s_bookmarkColor = m_bookmarks.GetColor();
+	MetalBar::s_codePreviewBg = m_previewBg.GetColor();
+	MetalBar::s_codePreviewFg = m_previewFg.GetColor();
 	MetalBar::s_cursorColor = (m_cursorColor.GetColor() & 0xffffff) | ((m_cursorTrans & 0xff) << 24);
 	MetalBar::s_barWidth = m_barWidth;
 	MetalBar::s_codePreviewWidth = m_codePreviewWidth;

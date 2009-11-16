@@ -46,6 +46,8 @@ private:
 	ColorChip					m_cursorColor;
 	ColorChip					m_breakpoints;
 	ColorChip					m_bookmarks;
+	ColorChip					m_previewBg;
+	ColorChip					m_previewFg;
 	unsigned int				m_cursorTrans;
 	unsigned int				m_barWidth;
 	unsigned int				m_requireALT;
