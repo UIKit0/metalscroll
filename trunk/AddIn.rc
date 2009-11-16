@@ -109,44 +109,48 @@ IDR_EDITCMDFILTER       REGISTRY                "EditCmdFilter.rgs"
 // Dialog
 //
 
-IDD_OPTIONS DIALOGEX 0, 0, 243, 162
+IDD_OPTIONS DIALOGEX 0, 0, 275, 175
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "MetalScroll Options"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    EDITTEXT        IDC_BAR_WIDTH,75,88,29,14,ES_AUTOHSCROLL | ES_NUMBER
-    EDITTEXT        IDC_CURSOR_TRANS,207,88,29,14,ES_AUTOHSCROLL | ES_NUMBER
-    DEFPUSHBUTTON   "OK",IDOK,7,141,50,14
-    PUSHBUTTON      "&Reset",IDC_RESET,96,141,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,186,141,50,14
-    CONTROL         "Custom1",IDC_WHITESPACE,"MetalScrollChip",0x0,75,7,29,14
-    CONTROL         "Custom1",IDC_COMMENTS,"MetalScrollChip",0x0,75,23,29,14
-    CONTROL         "Custom1",IDC_UPPERCASE,"MetalScrollChip",0x0,75,39,29,14
-    CONTROL         "Custom1",IDC_CHARACTERS,"MetalScrollChip",0x0,75,55,29,14
-    CONTROL         "Custom1",IDC_MATCHING_WORD,"MetalScrollChip",0x0,207,7,29,14
-    CONTROL         "Custom1",IDC_MODIF_LINE_SAVED,"MetalScrollChip",0x0,207,23,29,14
-    CONTROL         "Custom1",IDC_MODIF_LINE_UNSAVED,"MetalScrollChip",0x0,207,39,29,14
-    CONTROL         "Custom1",IDC_CURSOR_COLOR,"MetalScrollChip",0x0,207,55,29,14
-    LTEXT           "Bar Width",IDC_STATIC,7,89,32,8
+    EDITTEXT        IDC_BAR_WIDTH,101,103,29,14,ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_CURSOR_TRANS,239,103,29,14,ES_AUTOHSCROLL | ES_NUMBER
+    DEFPUSHBUTTON   "OK",IDOK,7,154,50,14
+    PUSHBUTTON      "&Reset",IDC_RESET,112,154,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,218,154,50,14
+    CONTROL         "Custom1",IDC_WHITESPACE,"MetalScrollChip",0x0,101,7,29,14
+    CONTROL         "Custom1",IDC_COMMENTS,"MetalScrollChip",0x0,101,23,29,14
+    CONTROL         "Custom1",IDC_UPPERCASE,"MetalScrollChip",0x0,101,39,29,14
+    CONTROL         "Custom1",IDC_CHARACTERS,"MetalScrollChip",0x0,101,55,29,14
+    CONTROL         "Custom1",IDC_MATCHING_WORD,"MetalScrollChip",0x0,239,7,29,14
+    CONTROL         "Custom1",IDC_MODIF_LINE_SAVED,"MetalScrollChip",0x0,239,23,29,14
+    CONTROL         "Custom1",IDC_MODIF_LINE_UNSAVED,"MetalScrollChip",0x0,239,39,29,14
+    CONTROL         "Custom1",IDC_CURSOR_COLOR,"MetalScrollChip",0x0,239,55,29,14
+    LTEXT           "Bar Width",IDC_STATIC,7,104,32,8
     LTEXT           "Uppercase Letters",IDC_STATIC,7,42,60,8
     LTEXT           "Comments",IDC_STATIC,7,26,34,8
     LTEXT           "Other Characters",IDC_STATIC,7,58,57,8
     LTEXT           "Whitespace",IDC_STATIC,7,10,38,8
-    LTEXT           "Matching Word",IDC_STATIC,124,10,49,8
-    LTEXT           "Modified Line - Saved",IDC_STATIC,124,26,69,8
-    LTEXT           "Modified Line - Unsaved",IDC_STATIC,124,42,77,8
-    LTEXT           "Cursor Color",IDC_STATIC,124,58,41,8
-    LTEXT           "Cursor Transparency",IDC_STATIC,124,89,68,8
-    CONTROL         "Custom1",IDC_BREAKPOINTS,"MetalScrollChip",0x0,75,71,29,14
-    CONTROL         "Custom1",IDC_BOOKMARKS,"MetalScrollChip",0x0,207,71,29,14
+    LTEXT           "Matching Word",IDC_STATIC,150,10,49,8
+    LTEXT           "Modified Line - Saved",IDC_STATIC,150,26,69,8
+    LTEXT           "Modified Line - Unsaved",IDC_STATIC,150,42,77,8
+    LTEXT           "Cursor Color",IDC_STATIC,150,58,41,8
+    LTEXT           "Cursor Transparency",IDC_STATIC,150,104,68,8
+    CONTROL         "Custom1",IDC_BREAKPOINTS,"MetalScrollChip",0x0,101,71,29,14
+    CONTROL         "Custom1",IDC_BOOKMARKS,"MetalScrollChip",0x0,239,71,29,14
     LTEXT           "Breakpoints",IDC_STATIC,7,74,38,8
-    LTEXT           "Bookmarks",IDC_STATIC,124,74,35,8
+    LTEXT           "Bookmarks",IDC_STATIC,150,74,35,8
     CONTROL         "Require ALT for double click highlighting",IDC_REQUIRE_ALT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,124,142,10
-    EDITTEXT        IDC_PREVIEW_WIDTH,75,105,29,14,ES_AUTOHSCROLL | ES_NUMBER
-    EDITTEXT        IDC_PREVIEW_HEIGHT,207,105,29,14,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "Preview Width",IDC_STATIC,7,106,47,8
-    LTEXT           "Preview Height",IDC_STATIC,124,106,49,8
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,138,142,10
+    EDITTEXT        IDC_PREVIEW_WIDTH,101,120,29,14,ES_AUTOHSCROLL | ES_NUMBER
+    EDITTEXT        IDC_PREVIEW_HEIGHT,239,120,29,14,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "Preview Width (characters)",IDC_STATIC,7,121,88,8
+    LTEXT           "Preview Height (lines)",IDC_STATIC,150,121,70,8
+    CONTROL         "Custom1",IDC_PREVIEW_BG,"MetalScrollChip",0x0,101,87,29,14
+    CONTROL         "Custom1",IDC_PREVIEW_FG,"MetalScrollChip",0x0,239,87,29,14
+    LTEXT           "Preview Background",IDC_STATIC,7,90,66,8
+    LTEXT           "Preview Text",IDC_STATIC,150,90,43,8
 END
 
 
@@ -161,9 +165,9 @@ BEGIN
     IDD_OPTIONS, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 236
+        RIGHTMARGIN, 268
         TOPMARGIN, 7
-        BOTTOMMARGIN, 155
+        BOTTOMMARGIN, 168
     END
 END
 #endif    // APSTUDIO_INVOKED

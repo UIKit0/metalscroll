@@ -29,11 +29,15 @@ public:
 
 	void						Show(HWND bar);
 	void						Hide();
-	void						Update(int y, const wchar_t* text);
+	void						Update(int y, wchar_t* text, int tabSize);
 	void						Resize(int width, int height);
 
 private:
 	static const char			s_className[];
+	static HFONT				s_normalFont;
+	static HFONT				s_boldFont;
+	static int					s_charWidth;
+	static int					s_lineHeight;
 
 	HWND						m_hwnd;
 	HDC							m_paintDC;
@@ -43,7 +47,14 @@ private:
 	int							m_rightEdge;
 	int							m_parentYMin;
 	int							m_parentYMax;
+	int							m_tabSize;
 
 	static LRESULT FAR PASCAL	WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	
+	wchar_t*					EatWhitespace(wchar_t* text, int* x, int* y);
+	wchar_t*					EatString(wchar_t* text, int* x);
+	wchar_t*					EatComment(wchar_t* text, int* x);
+	wchar_t*					EatIdentifier(wchar_t* text, int* x);
 	void						OnPaint(HDC dc);
+
 };

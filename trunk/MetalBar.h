@@ -46,6 +46,8 @@ public:
 	static unsigned int				s_breakpointColor;
 	static unsigned int				s_bookmarkColor;
 	static unsigned int				s_requireAltForHighlight;
+	static unsigned int				s_codePreviewBg;
+	static unsigned int				s_codePreviewFg;
 	static unsigned int				s_codePreviewWidth;
 	static unsigned int				s_codePreviewHeight;
 
@@ -110,6 +112,7 @@ private:
 	unsigned int*					m_backBufferBits;
 	unsigned int					m_backBufferWidth;
 	unsigned int					m_backBufferHeight;
+	unsigned int					m_tabSize;
 
 	// Scrollbar stuff.
 	int								m_pageSize;

@@ -30,3 +30,4 @@ void ScaleImageVertically(unsigned int* dest, int destHeight, const unsigned int
 void Log(const char* fmt, ...);
 
 void FillSolidRect(HDC hdc, unsigned int color, const RECT& r);
+void StrokeRect(HDC hdc, unsigned int color, const RECT& r);

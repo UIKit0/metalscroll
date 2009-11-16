@@ -265,6 +265,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\CppKeywords.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\EditCmdFilter.cpp"
 				>
 			</File>
