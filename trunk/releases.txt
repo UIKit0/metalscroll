@@ -1,3 +1,12 @@
+ Version 1.0.5 (revision 50)
+-----------------------------
+  - holding down ALT for double-click highlighting is optional
+  - when the code image is taller than the scrollbar, it is scaled with a linear filter
+  - replaced the middle-click preview tooltip with a custom window which uses a fixed width font and features basic syntax highlighting and proper tab handling
+  - fixed: right edge markers (breakpoints, bookmarks etc.) were drawn at a hardcoded location instead of respecting the real bar width
+  - fixed: double-click highlighting was also marking partial matches; it only matches whole words now
+  - fixed: tabs were always expanded as tab-size pixels, instead of jumping to the next tab-size-aligned column
+
  Version 1.0.4 (revision 41)
 -----------------------------
   - fixed: alt-double click on a blank line freezes the IDE
