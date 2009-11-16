@@ -265,7 +265,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\CppKeywords.cpp"
+				RelativePath=".\CppLexer.cpp"
 				>
 			</File>
 			<File
@@ -324,6 +324,10 @@
 			</File>
 			<File
 				RelativePath="Connect.h"
+				>
+			</File>
+			<File
+				RelativePath=".\CppLexer.h"
 				>
 			</File>
 			<File

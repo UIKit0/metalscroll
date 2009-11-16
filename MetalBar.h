@@ -101,6 +101,8 @@ private:
 	IVsTextView*					m_view;
 	long							m_numLines;
 	CEditCmdFilter*					m_editCmdFilter;
+	CComBSTR						m_highlightWord;
+	bool							m_isCppLikeLanguage;
 
 	// Painting.
 	HBITMAP							m_codeImg;
