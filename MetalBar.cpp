@@ -847,7 +847,7 @@ void MetalBar::RenderCodeImg(int barHeight)
 		{
 			color = s_whitespaceColor;
 			if(*chr == L'\t')
-				numChars = (int)m_tabSize;
+				numChars = m_tabSize - (linePos % m_tabSize);
 
 			// Tabs count as a single character for the column tracking.
 			++currentTextColumn;
