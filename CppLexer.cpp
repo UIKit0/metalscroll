@@ -212,17 +212,24 @@ bool IsCppKeyword(const wchar_t* str, unsigned int len)
 
 bool IsCppIdSeparator(wchar_t chr)
 {
+	CharClass cls = GetCharClass(chr);
+	switch(cls)
+	{
+		case CharClass_Digit:
+		case CharClass_Letter:
+			return false;
+		default:
+			return (chr != L'_');
+	}
+}
+
+CharClass GetCharClass(wchar_t chr)
+{
 	if( (chr >= L'0') && (chr <= L'9') )
-		return false;
+		return CharClass_Digit;
 
-	if( (chr >= L'A') && (chr <= L'Z') )
-		return false;
+	if( ((chr >= L'A') && (chr <= L'Z')) || ((chr >= L'a') && (chr <= L'z')) )
+		return CharClass_Letter;
 
-	if( (chr >= L'a') && (chr <= L'z') )
-		return false;
-
-	if(chr == L'_')
-		return false;
-
-	return true;
+	return CharClass_Other;
 }

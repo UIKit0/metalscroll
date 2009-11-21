@@ -722,17 +722,6 @@ void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightLis
 	ProcessLineMarkers(buffer, g_highlightMarkerType, AddHighlightOp(this, lines, storage));
 }
 
-#define ADVANCE_LINE()													\
-	if(!(lines[currentTextLine].flags & LineMarker_Hidden))				\
-	{																	\
-		for(unsigned int i = linePos; i < s_barWidth; ++i)				\
-			pixel[i] = s_whitespaceColor;								\
-																		\
-		PaintLineFlags(pixel, lines[currentTextLine].flags);			\
-	}																	\
-	++currentTextLine;													\
-	currentTextColumn = 0
-
 void MetalBar::RenderCodeImg(int barHeight)
 {
 	CComPtr<IVsTextLines> buffer;
@@ -764,11 +753,9 @@ void MetalBar::RenderCodeImg(int barHeight)
 	HighlightList highlightStorage;
 	GetHighlights(lines, buffer, highlightStorage);
 
-	unsigned int linePos = 0;
 	std::vector<unsigned int> imgBuffer;
 	imgBuffer.reserve(m_numLines*s_barWidth);
 	imgBuffer.resize(s_barWidth);
-	unsigned int* pixel = &imgBuffer[0];
 
 	enum CommentType
 	{
@@ -776,42 +763,94 @@ void MetalBar::RenderCodeImg(int barHeight)
 		CommentType_SingleLine,
 		CommentType_MultiLine
 	} commentType = CommentType_None;
-	
-	int realNumLines = 0;
-	int currentTextLine = 0;
-	unsigned int currentTextColumn = 0;
+
+	// Here "virtual" refers to rendered coordinates, which can differ from real text coordinates due to word wrapping,
+	// hidden text regions and tabs.
+	int virtualLine = 0;
+	int virtualColumn = 0;
+	int realLine = 0;
+	int realColumn = 0;
+
 	Highlight* crHighlight = lines[0].highlights;
-	for(wchar_t* chr = text; *chr; ++chr)
+	unsigned int* pixel = &imgBuffer[0];
+
+	for(wchar_t* chr = text; ; ++chr)
 	{
-		// Check for newline.
-		if( (chr[0] == L'\r') || (chr[0] == L'\n') )
+		// Check for a real newline, a virtual newline (due to word wrapping) or the end of the text.
+		bool isRealNewline = (chr[0] == L'\r') || (chr[0] == L'\n');
+		bool isVirtualNewline = (virtualColumn >= wrapAfter);
+		bool isTextEnd = (chr[0] == 0);
+		bool isLineVisible = !(lines[realLine].flags & LineMarker_Hidden);
+		if(isRealNewline || isVirtualNewline || isTextEnd)
 		{
-			// In case of CRLF, eat the next character.
-			if( (chr[0] == L'\r') && (chr[1] == L'\n') )
-				++chr;
-
-			ADVANCE_LINE();
-
-			crHighlight = lines[currentTextLine].highlights;
-
-			if(!(lines[currentTextLine].flags & LineMarker_Hidden))
+			if(isLineVisible)
 			{
-				// Advance the image pointer.
-				linePos = 0;
-				++realNumLines;
-				imgBuffer.resize((realNumLines+1) * s_barWidth);
-				pixel = &imgBuffer[realNumLines * s_barWidth];
-			}
-			else
-			{
-				// Setting linePos to s_barWidth will prevent the code below from trying to draw
-				// this line (as it's hidden).
-				linePos = s_barWidth;
+				if(isVirtualNewline && !isRealNewline)
+				{
+					CharClass crChrClass = GetCharClass(*chr);
+					if(crChrClass != CharClass_Other)
+					{
+						// Go back looking for the beginning of the current "word", i.e. for the first character which doesn't
+						// match the class of the current character, or the (virtual) start of the line.
+						int currentWordLen = 1;
+						for(; currentWordLen <= virtualColumn; ++currentWordLen)
+						{
+							if(GetCharClass(chr[-currentWordLen]) != crChrClass)
+							{
+								--currentWordLen;
+								break;
+							}
+						}
+
+						// VS moves the entire word on the next line unless it starts on the 1st or 2nd column.
+						if(virtualColumn - currentWordLen > 1)
+						{
+							// Rewind the text so we can draw the entire wrapped word on the next line. Also, move back
+							// the virtual column so that the code below erases the part of the word we've already painted.
+							chr -= currentWordLen;
+							virtualColumn -= currentWordLen;
+						}
+					}
+				}
+
+				// Fill the remaining pixels with the whitespace color.
+				for(int i = virtualColumn; i < (int)s_barWidth; ++i)
+					pixel[i] = s_whitespaceColor;
+
+				PaintLineFlags(pixel, lines[realLine].flags);
+
+				// Advance the virtual line.
+				virtualColumn = 0;
+				++virtualLine;
+
+				if(!isTextEnd)
+				{
+					// Advance the image pointer.
+					imgBuffer.resize((virtualLine+1) * s_barWidth);
+					pixel = &imgBuffer[virtualLine * s_barWidth];
+				}
 			}
 
-			if(commentType == CommentType_SingleLine)
-				commentType = CommentType_None;
-			continue;
+			if(isTextEnd)
+				break;
+
+			if(isRealNewline)
+			{
+				++realLine;
+				realColumn = 0;
+
+				// In case of CRLF, eat the next character too.
+				if( (chr[0] == L'\r') && (chr[1] == L'\n') )
+					++chr;
+
+				crHighlight = lines[realLine].highlights;
+
+				if(commentType == CommentType_SingleLine)
+					commentType = CommentType_None;
+				continue;
+			}
+
+			// If it's a virtual newline, we keep processing the current character.
 		}
 
 		unsigned int color = s_whitespaceColor;
@@ -843,55 +882,42 @@ void MetalBar::RenderCodeImg(int barHeight)
 
 				case CommentType_MultiLine:
 					color = s_commentColor;
-					if( (chr[0] == L'*') && (chr[1] == L'/') )
-					{
+					if( (chr[-1] == L'*') && (chr[0] == L'/') )
 						commentType = CommentType_None;
-						// The slash must be painted with the comment color too, so skip it and draw two dots.
-						numChars = 2;
-						++chr;
-					}
 					break;
 			}
 
 			// Advance the highlight interval, if needed.
-			while(crHighlight && (currentTextColumn > crHighlight->end))
+			while(crHighlight && (realColumn > (int)crHighlight->end))
 				crHighlight = crHighlight->next;
 
 			// Override the color with the match color if inside a marker.
-			if(crHighlight && (currentTextColumn >= crHighlight->start))
+			if(crHighlight && (realColumn >= (int)crHighlight->start))
 				color = s_matchColor;
-
-			// Advance the current column by the correct number of characters.
-			currentTextColumn += numChars;
 		}
 		else
 		{
 			color = s_whitespaceColor;
 			if(*chr == L'\t')
-				numChars = m_tabSize - (linePos % m_tabSize);
-
-			// Tabs count as a single character for the column tracking.
-			++currentTextColumn;
+				numChars = m_tabSize - (virtualColumn % m_tabSize);
 		}
 
-		for(int i = 0; i < numChars; ++i)
+		if(isLineVisible)
 		{
-			// We can draw at most s_barWidth characters per line.
-			if(linePos >= s_barWidth)
-				break;
-
-			pixel[linePos] = color;
-			++linePos;
+			for(int i = virtualColumn; (i < virtualColumn + numChars) && (i < (int)s_barWidth); ++i)
+				pixel[i] = color;
 		}
+
+		++realColumn;
+		virtualColumn += numChars;
 	}
 
-	ADVANCE_LINE();
-	assert(currentTextLine == m_numLines);
+	assert(realLine == m_numLines - 1);
 
 	if(m_codeImg)
 		DeleteObject(m_codeImg);
 
-	m_numLines = realNumLines + 1;
+	m_numLines = virtualLine;
 	m_codeImgHeight = m_numLines < barHeight ? m_numLines : barHeight;
 
 	BITMAPINFO bi;
