@@ -52,53 +52,6 @@ public:
 	static unsigned int				s_codePreviewHeight;
 
 private:
-	enum LineMarker
-	{
-		LineMarker_Hidden			= 0x01,
-		LineMarker_ChangedUnsaved	= 0x02,
-		LineMarker_ChangedSaved		= 0x04,
-		LineMarker_Breakpoint		= 0x08,
-		LineMarker_Bookmark			= 0x10,
-		LineMarker_Match			= 0x20
-	};
-
-	struct Highlight
-	{
-		unsigned int				start;
-		unsigned int				end;
-		Highlight*					next;
-	};
-
-	struct LineInfo
-	{
-		unsigned int				flags;
-		Highlight*					highlights;
-	};
-
-	typedef std::vector<LineInfo>	LineList;
-	typedef std::vector<Highlight>	HighlightList;
-
-	struct MarkerOperator
-	{
-		virtual void NotifyCount(int /*numMarkers*/) const {}
-		virtual void Process(IVsTextLineMarker* marker, int idx) const = 0;
-	};
-
-	struct RenderOperator
-	{
-		enum TextFlags
-		{
-			TextFlag_Comment	= 0x01,
-			TextFlag_Highlight	= 0x02,
-			TextFlag_Keyword	= 0x04
-		};
-
-		virtual void Init(int numLines) = 0;
-		virtual void AdvanceLine(int crLine, int crColumn, unsigned int crLineFlags, bool textEnd) = 0;
-		virtual void RenderSpaces(int column, int count) = 0;
-		virtual void RenderText(int column, const wchar_t* text, int len, unsigned int flags) = 0;
-	};
-
 	static std::set<MetalBar*>		s_bars;
 
 	static bool						ReadRegInt(unsigned int* to, HKEY key, const char* name);
@@ -136,25 +89,16 @@ private:
 	int								m_scrollMax;
 	bool							m_dragging;
 
-	bool							GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
-	bool							GetFileName(CComBSTR& name, IVsTextLines* buffer);
-	void							ProcessLineMarkers(IVsTextLines* buffer, int type, const MarkerOperator& op);
-
 	void							OnDrag(bool initial);
 	void							OnTrackPreview();
 	void							OnPaint(HDC ctrlDC);
 	void							AdjustSize(unsigned int requiredWidth);
 	void							RemoveWndProcHook();
 
+	bool							GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
 	void							HighlightMatchingWords();
 	void							RemoveWordHighlight(IVsTextLines* buffer);
 
-	void							MarkLineRange(LineList& lines, unsigned int flag, int start, int end);
-	void							FindHiddenLines(LineList& lines, IVsTextLines* buffer);
-	void							FindBreakpoints(LineList& lines, IVsTextLines* buffer);
-	void							GetLineFlags(LineList& lines, IVsTextLines* buffer);
-	void							GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightList& storage);
-	static void						PaintLineFlags(unsigned int* line, unsigned int flags);
-	int 							RenderCode(RenderOperator& renderOp);
+	void							PaintLineFlags(unsigned int* img, int line, int imgHeight, unsigned int flags);
 	void							RefreshCodeImg(int barHeight);
 };

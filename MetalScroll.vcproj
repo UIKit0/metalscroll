@@ -306,6 +306,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\TextFormatting.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\Utils.cpp"
 				>
 			</File>
@@ -357,6 +361,10 @@
 			</File>
 			<File
 				RelativePath=".\Resource.h"
+				>
+			</File>
+			<File
+				RelativePath=".\TextFormatting.h"
 				>
 			</File>
 			<File
