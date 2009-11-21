@@ -741,13 +741,19 @@ void MetalBar::RenderCodeImg(int barHeight)
 		return;
 
 	LANGPREFERENCES langPrefs;
+	int wrapAfter = INT_MAX;
+	m_tabSize = 4;
 	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
 	{
 		m_tabSize = langPrefs.uTabSize;
 		m_isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID);
+		if(langPrefs.fWordWrap)
+		{
+			long min, max, pageWidth, pos;
+			if(SUCCEEDED(m_view->GetScrollInfo(SB_HORZ, &min, &max, &pageWidth, &pos)) && (pageWidth > 1))
+				wrapAfter = pageWidth - 1;
+		}
 	}
-	else
-		m_tabSize = 4;
 
 	if(m_numLines < 1)
 		m_numLines = 1;
@@ -759,9 +765,10 @@ void MetalBar::RenderCodeImg(int barHeight)
 	GetHighlights(lines, buffer, highlightStorage);
 
 	unsigned int linePos = 0;
-	unsigned int* imgBuffer = new unsigned int[m_numLines*s_barWidth];
-	// Windows bitmaps are upside down for some retarded reason.
-	unsigned int* pixel = imgBuffer + (m_numLines - 1)*s_barWidth;
+	std::vector<unsigned int> imgBuffer;
+	imgBuffer.reserve(m_numLines*s_barWidth);
+	imgBuffer.resize(s_barWidth);
+	unsigned int* pixel = &imgBuffer[0];
 
 	enum CommentType
 	{
@@ -791,8 +798,9 @@ void MetalBar::RenderCodeImg(int barHeight)
 			{
 				// Advance the image pointer.
 				linePos = 0;
-				pixel -= s_barWidth;
 				++realNumLines;
+				imgBuffer.resize((realNumLines+1) * s_barWidth);
+				pixel = &imgBuffer[realNumLines * s_barWidth];
 			}
 			else
 			{
@@ -883,11 +891,7 @@ void MetalBar::RenderCodeImg(int barHeight)
 	if(m_codeImg)
 		DeleteObject(m_codeImg);
 
-	// The image may be shorter than we anticipated due to hidden sections. Since bitmaps are upside down,
-	// we must skip the first part of the buffer, which represents the last (unused) lines.
-	realNumLines += 1;
-	unsigned int* realImgStart = imgBuffer + (m_numLines - realNumLines)*s_barWidth;
-	m_numLines = realNumLines;
+	m_numLines = realNumLines + 1;
 	m_codeImgHeight = m_numLines < barHeight ? m_numLines : barHeight;
 
 	BITMAPINFO bi;
@@ -903,16 +907,21 @@ void MetalBar::RenderCodeImg(int barHeight)
 
 	if(m_numLines < barHeight)
 	{
-		// Copy the buffer to the bitmap directly.
-		memcpy(bmpBits, realImgStart, m_numLines*s_barWidth*4);
+		// Flip the image while copying it.
+		std::vector<unsigned int>::iterator line1 = imgBuffer.begin();
+		unsigned int* line2 = bmpBits + (m_numLines - 1)*s_barWidth;
+		for(int i = 0; i < m_numLines; ++i)
+		{
+			std::copy(line1, line1 + s_barWidth, line2);
+			line1 += s_barWidth;
+			line2 -= s_barWidth;
+		}
 	}
 	else
 	{
 		// Scale.
-		ScaleImageVertically(bmpBits, barHeight, realImgStart, m_numLines, s_barWidth);
+		FlipScaleImageVertically(bmpBits, barHeight, &imgBuffer[0], m_numLines, s_barWidth);
 	}
-
-	delete[] imgBuffer;
 
 	if(!m_imgDC)
 		m_imgDC = CreateCompatibleDC(0);
