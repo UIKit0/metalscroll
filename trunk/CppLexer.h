@@ -16,5 +16,13 @@
 
 #pragma once
 
+enum CharClass
+{
+	CharClass_Letter,
+	CharClass_Digit,
+	CharClass_Other
+};
+
 bool		IsCppIdSeparator(wchar_t chr);
 bool		IsCppKeyword(const wchar_t* str, unsigned int len);
+CharClass	GetCharClass(wchar_t chr);
