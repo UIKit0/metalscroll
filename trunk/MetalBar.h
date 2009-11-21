@@ -84,6 +84,21 @@ private:
 		virtual void Process(IVsTextLineMarker* marker, int idx) const = 0;
 	};
 
+	struct RenderOperator
+	{
+		enum TextFlags
+		{
+			TextFlag_Comment	= 0x01,
+			TextFlag_Highlight	= 0x02,
+			TextFlag_Keyword	= 0x04
+		};
+
+		virtual void Init(int numLines) = 0;
+		virtual void AdvanceLine(int crLine, int crColumn, unsigned int crLineFlags, bool textEnd) = 0;
+		virtual void RenderSpaces(int column, int count) = 0;
+		virtual void RenderText(int column, const wchar_t* text, int len, unsigned int flags) = 0;
+	};
+
 	static std::set<MetalBar*>		s_bars;
 
 	static bool						ReadRegInt(unsigned int* to, HKEY key, const char* name);
@@ -99,10 +114,9 @@ private:
 
 	// Text.
 	IVsTextView*					m_view;
-	long							m_numLines;
+	int								m_numLines;
 	CEditCmdFilter*					m_editCmdFilter;
 	CComBSTR						m_highlightWord;
-	bool							m_isCppLikeLanguage;
 
 	// Painting.
 	HBITMAP							m_codeImg;
@@ -114,7 +128,6 @@ private:
 	unsigned int*					m_backBufferBits;
 	unsigned int					m_backBufferWidth;
 	unsigned int					m_backBufferHeight;
-	unsigned int					m_tabSize;
 
 	// Scrollbar stuff.
 	int								m_pageSize;
@@ -141,6 +154,7 @@ private:
 	void							FindBreakpoints(LineList& lines, IVsTextLines* buffer);
 	void							GetLineFlags(LineList& lines, IVsTextLines* buffer);
 	void							GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightList& storage);
-	void							PaintLineFlags(unsigned int* line, unsigned int flags);
-	void							RenderCodeImg(int barHeight);
+	static void						PaintLineFlags(unsigned int* line, unsigned int flags);
+	int 							RenderCode(RenderOperator& renderOp);
+	void							RefreshCodeImg(int barHeight);
 };

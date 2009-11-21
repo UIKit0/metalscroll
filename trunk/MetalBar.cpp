@@ -74,7 +74,6 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 	m_backBufferBits = 0;
 	m_backBufferWidth = 0;
 	m_backBufferHeight = 0;
-	m_tabSize = 4;
 
 	m_pageSize = 1;
 	m_scrollPos = 0;
@@ -230,7 +229,8 @@ void MetalBar::OnTrackPreview()
 	if(FAILED(hr) || !text)
 		return;
 
-	g_codePreviewWnd.Update(clRect.top + clampedY, text, m_tabSize, m_highlightWord, m_isCppLikeLanguage);
+	//FIXME
+	//g_codePreviewWnd.Update(clRect.top + clampedY, text, m_tabSize, m_highlightWord, m_isCppLikeLanguage);
 }
 
 LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -469,14 +469,15 @@ void MetalBar::FindHiddenLines(LineList& lines, IVsTextLines* buffer)
 void MetalBar::MarkLineRange(LineList& lines, unsigned int flag, int start, int end)
 {
 	// Mark the surrounding lines too, because single-pixel margins are impossible to see.
+	int numLines = (int)lines.size();
 	int extraLines;
-	if((int)m_backBufferHeight < m_numLines)
-		extraLines = int(2.0f * m_numLines / m_backBufferHeight);
+	if((int)m_backBufferHeight < numLines)
+		extraLines = int(2.0f * numLines / m_backBufferHeight);
 	else
 		extraLines = 2;
 
 	start = std::max(start - extraLines, 0);
-	end = std::min(end + extraLines, (int)m_numLines - 1);
+	end = std::min(end + extraLines, numLines - 1);
 	for(int i = start; i <= end; ++i)
 		lines[i].flags |= flag;
 }
@@ -722,20 +723,22 @@ void MetalBar::GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightLis
 	ProcessLineMarkers(buffer, g_highlightMarkerType, AddHighlightOp(this, lines, storage));
 }
 
-void MetalBar::RenderCodeImg(int barHeight)
+int MetalBar::RenderCode(RenderOperator& renderOp)
 {
 	CComPtr<IVsTextLines> buffer;
 	CComBSTR text;
-	if(!GetBufferAndText(&buffer, &text, &m_numLines))
-		return;
+	long numLines;
+	if(!GetBufferAndText(&buffer, &text, &numLines))
+		return 0;
 
 	LANGPREFERENCES langPrefs;
 	int wrapAfter = INT_MAX;
-	m_tabSize = 4;
+	int tabSize = 4;
+	bool isCppLikeLanguage = false;
 	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
 	{
-		m_tabSize = langPrefs.uTabSize;
-		m_isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID);
+		tabSize = langPrefs.uTabSize;
+		isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID);
 		if(langPrefs.fWordWrap)
 		{
 			long min, max, pageWidth, pos;
@@ -744,18 +747,16 @@ void MetalBar::RenderCodeImg(int barHeight)
 		}
 	}
 
-	if(m_numLines < 1)
-		m_numLines = 1;
+	if(numLines < 1)
+		numLines = 1;
 
 	LineInfo defaultLineInfo = { 0 };
-	LineList lines(m_numLines, defaultLineInfo);
+	LineList lines(numLines, defaultLineInfo);
 	GetLineFlags(lines, buffer);
 	HighlightList highlightStorage;
 	GetHighlights(lines, buffer, highlightStorage);
 
-	std::vector<unsigned int> imgBuffer;
-	imgBuffer.reserve(m_numLines*s_barWidth);
-	imgBuffer.resize(s_barWidth);
+	renderOp.Init(numLines);
 
 	enum CommentType
 	{
@@ -770,9 +771,7 @@ void MetalBar::RenderCodeImg(int barHeight)
 	int virtualColumn = 0;
 	int realLine = 0;
 	int realColumn = 0;
-
 	Highlight* crHighlight = lines[0].highlights;
-	unsigned int* pixel = &imgBuffer[0];
 
 	for(wchar_t* chr = text; ; ++chr)
 	{
@@ -813,22 +812,11 @@ void MetalBar::RenderCodeImg(int barHeight)
 					}
 				}
 
-				// Fill the remaining pixels with the whitespace color.
-				for(int i = virtualColumn; i < (int)s_barWidth; ++i)
-					pixel[i] = s_whitespaceColor;
-
-				PaintLineFlags(pixel, lines[realLine].flags);
+				renderOp.AdvanceLine(virtualLine, virtualColumn, lines[realLine].flags, isTextEnd);
 
 				// Advance the virtual line.
 				virtualColumn = 0;
 				++virtualLine;
-
-				if(!isTextEnd)
-				{
-					// Advance the image pointer.
-					imgBuffer.resize((virtualLine+1) * s_barWidth);
-					pixel = &imgBuffer[virtualLine * s_barWidth];
-				}
 			}
 
 			if(isTextEnd)
@@ -853,35 +841,32 @@ void MetalBar::RenderCodeImg(int barHeight)
 			// If it's a virtual newline, we keep processing the current character.
 		}
 
-		unsigned int color = s_whitespaceColor;
 		int numChars = 1;
 		if(*chr > L' ')
 		{
+			unsigned int textFlags = 0;
+
 			switch(commentType)
 			{
 				case CommentType_None:
-					if( m_isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'/') )
+					if( isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'/') )
 					{
-						color = s_commentColor;
+						textFlags |= RenderOperator::TextFlag_Comment;
 						commentType = CommentType_SingleLine;
 					}
-					else if( m_isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'*') )
+					else if( isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'*') )
 					{
-						color = s_commentColor;
+						textFlags |= RenderOperator::TextFlag_Comment;
 						commentType = CommentType_MultiLine;
 					}
-					else if( (*chr >= L'A') && (*chr <= L'Z') )
-						color = s_upperCaseColor;
-					else
-						color = s_characterColor;
 					break;
 
 				case CommentType_SingleLine:
-					color = s_commentColor;
+					textFlags |= RenderOperator::TextFlag_Comment;
 					break;
 
 				case CommentType_MultiLine:
-					color = s_commentColor;
+					textFlags |= RenderOperator::TextFlag_Comment;
 					if( (chr[-1] == L'*') && (chr[0] == L'/') )
 						commentType = CommentType_None;
 					break;
@@ -893,32 +878,93 @@ void MetalBar::RenderCodeImg(int barHeight)
 
 			// Override the color with the match color if inside a marker.
 			if(crHighlight && (realColumn >= (int)crHighlight->start))
-				color = s_matchColor;
+				textFlags |= RenderOperator::TextFlag_Highlight;
+
+			if(isLineVisible)
+				renderOp.RenderText(virtualColumn, chr, 1, textFlags);
 		}
 		else
 		{
-			color = s_whitespaceColor;
 			if(*chr == L'\t')
-				numChars = m_tabSize - (virtualColumn % m_tabSize);
-		}
+				numChars = tabSize - (virtualColumn % tabSize);
 
-		if(isLineVisible)
-		{
-			for(int i = virtualColumn; (i < virtualColumn + numChars) && (i < (int)s_barWidth); ++i)
-				pixel[i] = color;
+			if(isLineVisible)
+				renderOp.RenderSpaces(virtualColumn, numChars);
 		}
 
 		++realColumn;
 		virtualColumn += numChars;
 	}
 
-	assert(realLine == m_numLines - 1);
+	assert(realLine == numLines - 1);
+	return virtualLine;
+}
+
+void MetalBar::RefreshCodeImg(int barHeight)
+{
+	struct BarRenderOp : public RenderOperator
+	{
+		BarRenderOp(std::vector<unsigned int>& _imgBuffer) : imgBuffer(_imgBuffer) {}
+
+		void Init(int numLines)
+		{
+			imgBuffer.reserve(numLines*s_barWidth);
+			imgBuffer.resize(s_barWidth);
+			pixel = &imgBuffer[0];
+		}
+
+		void AdvanceLine(int crLine, int crColumn, unsigned int crLineFlags, bool textEnd)
+		{
+			// Fill the remaining pixels with the whitespace color.
+			for(int i = crColumn; i < (int)s_barWidth; ++i)
+				pixel[i] = s_whitespaceColor;
+
+			PaintLineFlags(pixel, crLineFlags);
+
+			if(!textEnd)
+			{
+				// Advance the image pointer.
+				imgBuffer.resize((crLine + 2) * s_barWidth);
+				pixel = &imgBuffer[(crLine + 1) * s_barWidth];
+			}
+		}
+
+		void RenderSpaces(int column, int count)
+		{
+			for(int i = column; (i < column + count) && (i < (int)s_barWidth); ++i)
+				pixel[i] = s_whitespaceColor;
+		}
+
+		void RenderText(int column, const wchar_t* text, int len, unsigned int flags)
+		{
+			for(int i = column; (i < column + len) && (i < (int)s_barWidth); ++i)
+			{
+				if(flags & TextFlag_Highlight)
+					pixel[i] = s_matchColor;
+				else if(flags & TextFlag_Comment)
+					pixel[i] = s_commentColor;
+				else if( (text[i - column] >= 'A') && (text[i - column] <= 'Z') )
+					pixel[i] = s_upperCaseColor;
+				else
+					pixel[i] = s_characterColor;
+			}
+		}
+
+		std::vector<unsigned int>& imgBuffer;
+		unsigned int* pixel;
+	};
+
+	std::vector<unsigned int> imgBuffer;
+	BarRenderOp renderOp(imgBuffer);
+	int numLines = RenderCode(renderOp);
+	if(!numLines)
+		return;
+
+	m_numLines = numLines;
+	m_codeImgHeight = m_numLines < barHeight ? m_numLines : barHeight;
 
 	if(m_codeImg)
 		DeleteObject(m_codeImg);
-
-	m_numLines = virtualLine;
-	m_codeImgHeight = m_numLines < barHeight ? m_numLines : barHeight;
 
 	BITMAPINFO bi;
 	memset(&bi, 0, sizeof(bi));
@@ -995,7 +1041,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	if(!m_codeImg || m_codeImgDirty)
 	{
 		m_codeImgDirty = false;
-		RenderCodeImg(barHeight);
+		RefreshCodeImg(barHeight);
 		// Re-arm the refresh timer.
 		SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
 	}
