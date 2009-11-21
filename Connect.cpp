@@ -190,9 +190,9 @@ void CConnect::HookScrollbar(IVsTextView* view)
 
 	ScrollbarHandles bars = { 0 };
 	EnumChildWindows(GetParent(editorHwnd), FindScrollbars, (LPARAM)&bars);
-	if(!bars.horiz || !bars.vert)
+	if(!bars.vert)
 	{
-		Log("MetalScroll: Scrollbars not found.\n");
+		Log("MetalScroll: Vertical scrollbar not found.\n");
 		return;
 	}
 
