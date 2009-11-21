@@ -25,7 +25,7 @@ template<typename T> static inline int clamp(const T& x, const T& min, const T& 
 }
 
 void InitScaler();
-void ScaleImageVertically(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width);
+void FlipScaleImageVertically(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width);
 
 void Log(const char* fmt, ...);
 

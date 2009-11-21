@@ -19,14 +19,20 @@
 
 static bool g_hasSSE2 = false;
 
-static void ScaleImagePlainC(unsigned char* dest, int destHeight, const unsigned char* src, int srcHeight, int width)
+static void FlipScaleImagePlainC(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width)
 {
 	float yaspect = 1.0f * srcHeight / destHeight;
 	float invAspect = 1.0f / yaspect;
 	float lowY = 0.0f;
 
+	// Also flip the image.
+	dest = dest + destHeight*width;
+
 	for(int i = 0; i < destHeight; ++i)
 	{
+		dest -= width;
+		unsigned char* destPixel = (unsigned char*)dest;
+
 		float highY = lowY + yaspect;
 		if(highY > srcHeight)
 		{
@@ -36,7 +42,7 @@ static void ScaleImagePlainC(unsigned char* dest, int destHeight, const unsigned
 		}
 
 		int srcStartY = (int)lowY;
-		const unsigned char* srcLineStart = src + srcStartY*width*4;
+		const unsigned char* srcLineStart = (unsigned char*)(src + srcStartY*width);
 
 		// Compute the weights for the first and last pixel.
 		float truncLowY = (float)srcStartY;
@@ -71,8 +77,8 @@ static void ScaleImagePlainC(unsigned char* dest, int destHeight, const unsigned
 
 			// Divide by area.
 			for(int k = 0; k < 3; ++k)
-				dest[k] = (unsigned char)((int)(pixel[k] * invAspect));
-			dest += 4;
+				destPixel[k] = (unsigned char)((int)(pixel[k] * invAspect));
+			destPixel += 4;
 		}
 
 		lowY += yaspect;
@@ -88,7 +94,7 @@ static __m128 LoadPixel(unsigned int p)
 	return _mm_cvtepi32_ps(intPixel);
 }
 
-static void ScaleImageSSE(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width)
+static void FlipScaleImageSSE(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width)
 {
 	float yaspect = 1.0f * srcHeight / destHeight;
 	float lowY = 0.0f;
@@ -96,8 +102,14 @@ static void ScaleImageSSE(unsigned int* dest, int destHeight, const unsigned int
 	float invAspectTmp = 1.0f / yaspect;
 	__m128 invAspect = _mm_load1_ps(&invAspectTmp);
 
+	// Also flip the image.
+	dest = dest + destHeight*width;
+
 	for(int i = 0; i < destHeight; ++i)
 	{
+		dest -= width;
+		unsigned int* destPixel = dest;
+
 		float highY = lowY + yaspect;
 		if(highY > srcHeight)
 		{
@@ -149,20 +161,20 @@ static void ScaleImageSSE(unsigned int* dest, int destHeight, const unsigned int
 			__m128i intPixel = _mm_cvtps_epi32(accumPixel);
 			intPixel = _mm_packs_epi32(intPixel, intPixel);
 			intPixel = _mm_packus_epi16(intPixel, intPixel);
-			*dest =  _mm_cvtsi128_si32(intPixel);
-			++dest;
+			*destPixel =  _mm_cvtsi128_si32(intPixel);
+			++destPixel;
 		}
 
 		lowY += yaspect;
 	}
 }
 
-void ScaleImageVertically(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width)
+void FlipScaleImageVertically(unsigned int* dest, int destHeight, const unsigned int* src, int srcHeight, int width)
 {
 	if(g_hasSSE2)
-		ScaleImageSSE(dest, destHeight, src, srcHeight, width);
+		FlipScaleImageSSE(dest, destHeight, src, srcHeight, width);
 	else
-		ScaleImagePlainC((unsigned char*)dest, destHeight, (unsigned char*)src, srcHeight, width);
+		FlipScaleImagePlainC(dest, destHeight, src, srcHeight, width);
 }
 
 void InitScaler()
