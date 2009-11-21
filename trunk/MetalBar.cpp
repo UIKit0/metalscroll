@@ -140,11 +140,18 @@ void MetalBar::AdjustSize(unsigned int requiredWidth)
 		return;
 
 	// Resize the horizontal scroll bar.
-	WINDOWPLACEMENT horizBarPlacement;
-	horizBarPlacement.length = sizeof(horizBarPlacement);
-	GetWindowPlacement(m_horizBar, &horizBarPlacement);
-	horizBarPlacement.rcNormalPosition.right -= diff;
-	SetWindowPlacement(m_horizBar, &horizBarPlacement);
+	int horizBarHeight;
+	if(m_horizBar)
+	{
+		WINDOWPLACEMENT horizBarPlacement;
+		horizBarPlacement.length = sizeof(horizBarPlacement);
+		GetWindowPlacement(m_horizBar, &horizBarPlacement);
+		horizBarPlacement.rcNormalPosition.right -= diff;
+		SetWindowPlacement(m_horizBar, &horizBarPlacement);
+		horizBarHeight = horizBarPlacement.rcNormalPosition.bottom - horizBarPlacement.rcNormalPosition.top;
+	}
+	else
+		horizBarHeight = 0;
 
 	// Resize the editor window.
 	WINDOWPLACEMENT editorPlacement;
@@ -156,7 +163,7 @@ void MetalBar::AdjustSize(unsigned int requiredWidth)
 	// Make the vertical bar wider so we can draw our stuff in it. Also expand its height to fill the gap left when
 	// shrinking the horizontal bar.
 	vertBarPlacement.rcNormalPosition.left -= diff;
-	vertBarPlacement.rcNormalPosition.bottom += horizBarPlacement.rcNormalPosition.bottom - horizBarPlacement.rcNormalPosition.top;
+	vertBarPlacement.rcNormalPosition.bottom += horizBarHeight;
 	SetWindowPlacement(m_hwnd, &vertBarPlacement);
 }
 
