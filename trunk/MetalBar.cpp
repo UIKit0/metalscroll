@@ -479,15 +479,14 @@ struct BarRenderOp : public RenderOperator
 
 	BarRenderOp(std::vector<unsigned int>& _imgBuffer, MarkedLineList& _markedLines) : imgBuffer(_imgBuffer), markedLines(_markedLines) {}
 
-	bool Init(int numLines)
+	void Init(int numLines)
 	{
 		imgBuffer.reserve(numLines*MetalBar::s_barWidth);
 		imgBuffer.resize(MetalBar::s_barWidth);
 		markedLines.reserve(numLines);
-		return true;
 	}
 
-	bool EndLine(int line, int lastColumn, unsigned int lineFlags, bool textEnd)
+	void EndLine(int line, int lastColumn, unsigned int lineFlags, bool textEnd)
 	{
 		// Fill the remaining pixels with the whitespace color.
 		for(int i = lastColumn; i < (int)MetalBar::s_barWidth; ++i)
@@ -501,8 +500,6 @@ struct BarRenderOp : public RenderOperator
 			// Advance the image pointer.
 			imgBuffer.resize((line + 2) * MetalBar::s_barWidth);
 		}
-
-		return true;
 	}
 
 	void RenderSpaces(int line, int column, int count)

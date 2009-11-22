@@ -43,8 +43,8 @@ enum TextFlags
 
 struct RenderOperator
 {
-	virtual bool Init(int numLines) = 0;
-	virtual bool EndLine(int line, int lastColumn, unsigned int lineFlags, bool textEnd) = 0;
+	virtual void Init(int numLines) = 0;
+	virtual void EndLine(int line, int lastColumn, unsigned int lineFlags, bool textEnd) = 0;
 	virtual void RenderSpaces(int line, int column, int count) = 0;
 	virtual void RenderCharacter(int line, int column, wchar_t chr, unsigned int flags) = 0;
 };

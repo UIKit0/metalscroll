@@ -42,6 +42,18 @@ void CodePreview::Destroy()
 {
 	Hide();
 
+	if(m_codeBmp)
+	{
+		DeleteObject(m_codeBmp);
+		m_codeBmp = 0;
+	}
+
+	if(m_paintDC)
+	{
+		DeleteDC(m_paintDC);
+		m_paintDC = 0;
+	}
+
 	if(m_hwnd)
 	{
 		DestroyWindow(m_hwnd);
@@ -130,182 +142,55 @@ void CodePreview::Create(HWND parent, int width, int height)
 	m_hwnd = CreateWindowA(s_className, "CodePreview", style, 0, 0, m_wndWidth, m_wndHeight, parent, 0, _AtlModule.GetResourceInstance(), this);
 }
 
-//static int g_textDrawTime;
-//static int g_fillTime;
-//#pragma comment(lib, "winmm.lib")
-
 struct PreviewRenderOp : RenderOperator
 {
-	PreviewRenderOp(HDC _paintDC, int _imgWidth) : paintDC(_paintDC), imgWidth(_imgWidth) {}
+	PreviewRenderOp(std::vector<CodePreview::CharInfo>& text, int lineWidth) : m_text(text), m_lineWidth(lineWidth) {}
 
-	void AllocImg(int lines, HBITMAP* bmp, void** bits)
+	void Init(int numLines)
 	{
-		BITMAPINFO bi;
-		memset(&bi, 0, sizeof(bi));
-		bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
-		bi.bmiHeader.biWidth = imgWidth;
-		bi.bmiHeader.biHeight = lines * CodePreview::s_lineHeight;
-		bi.bmiHeader.biPlanes = 1;
-		bi.bmiHeader.biBitCount = 32;
-		bi.bmiHeader.biCompression = BI_RGB;
-		*bmp = CreateDIBSection(0, &bi, DIB_RGB_COLORS, bits, 0, 0);
+		m_text.reserve(numLines*m_lineWidth);
+		m_text.resize(m_lineWidth);
 	}
 
-	bool Init(int numLines)
+	void EndLine(int line, int lastColumn, unsigned int /*lineFlags*/, bool textEnd)
 	{
-		imgLines = numLines;
-		AllocImg(imgLines, &codeBmp, (void**)&codeBits);
-		if(!codeBmp || !codeBits)
-			return false;
+		if(lastColumn < m_lineWidth)
+			m_text[line*m_lineWidth + lastColumn].format = CodePreview::FormatType_EOL;
 
-		SelectObject(paintDC, codeBmp);
-		SetBkMode(paintDC, OPAQUE);
-
-		imgRect.left = 0; imgRect.right = imgWidth;
-		imgRect.top = 0; imgRect.bottom = imgLines*CodePreview::s_lineHeight;
-
-		txtBuf.reserve(imgWidth / CodePreview::s_charWidth);
-		txtBufFont = 0;
-		txtBufX = 0;
-		txtBufY = 0;
-		txtBufFgColor = 0;
-		txtBufBgColor = 0;
-
-		return true;
-	}
-
-	void FlushBuffer()
-	{
-		int numChars = (int)txtBuf.size();
-		if(numChars < 1)
-			return;
-
-		//DWORD start = timeGetTime();
-
-		SetBkColor(paintDC, RGB_TO_COLORREF(txtBufBgColor));
-		SetTextColor(paintDC, RGB_TO_COLORREF(txtBufFgColor));
-		SelectObject(paintDC, txtBufFont);
-		ExtTextOutW(paintDC, txtBufX, txtBufY, ETO_CLIPPED, &imgRect, &txtBuf[0], (int)numChars, 0);
-		txtBuf.resize(0);
-
-		//g_textDrawTime += timeGetTime() - start;
-	}
-
-	void FillRestOfLine(int line, int lastColumn)
-	{
-		int x = lastColumn * CodePreview::s_charWidth;
-		if(x >= imgWidth)
-			return;
-
-		int y = (imgLines - line - 1) * CodePreview::s_lineHeight;
-		unsigned int* start = codeBits + y*imgWidth + x;
-		const unsigned int* end = codeBits + (y + 1)*imgWidth;
-		for(int i = 0; i < CodePreview::s_lineHeight; ++i)
-		{
-			for(unsigned int* pixel = start; pixel < end; ++pixel)
-				*pixel = MetalBar::s_codePreviewBg;
-
-			start += imgWidth;
-			end += imgWidth;
-		}
-	}
-
-	bool EndLine(int line, int lastColumn, unsigned int /*lineFlags*/, bool textEnd)
-	{
-		FlushBuffer();
-
-		// Fill the rest of the line with the background color.
-		//DWORD start = timeGetTime();
-		FillRestOfLine(line, lastColumn);
-		//g_fillTime += timeGetTime() - start;
-
-		if(textEnd || (line < imgLines - 1))
-			return true;
-
-		// We have more lines than we anticipated, due to word wrapping. Make a larger image.
-		HBITMAP newBmp;
-		unsigned int* newBits;
-		int newNumLines = std::max(imgLines + imgLines / 10, imgLines + 10);
-		AllocImg(newNumLines, &newBmp, (void**)&newBits);
-		if(!newBmp || !newBits)
-			return false;
-
-		// Copy the old image into the new one. Since BMPs are upside down, we must offset the destination.
-		int offset = (newNumLines - imgLines)*CodePreview::s_lineHeight*imgWidth;
-		memcpy(newBits + offset, codeBits, imgLines*CodePreview::s_lineHeight*imgWidth*4);
-
-		// Delete the old image and replace it with the new one.
-		SelectObject(paintDC, newBmp);
-		DeleteObject(codeBmp);
-		codeBmp = newBmp;
-		codeBits = newBits;
-		imgLines = newNumLines;
-		imgRect.bottom = imgLines*CodePreview::s_lineHeight;
-
-		return true;
+		if(!textEnd)
+			m_text.resize((line + 2) * m_lineWidth);
 	}
 
 	void RenderSpaces(int line, int column, int count)
 	{
-		if(txtBuf.empty())
+		for(int i = column; (i < column + count) && (i < m_lineWidth); ++i)
 		{
-			txtBufX = column*CodePreview::s_charWidth;
-			txtBufY = line*CodePreview::s_lineHeight;
-			txtBufFont = CodePreview::s_normalFont;
-			txtBufBgColor = MetalBar::s_codePreviewBg;
-			txtBufFgColor = MetalBar::s_codePreviewFg;
+			m_text[line*m_lineWidth + i].format = CodePreview::FormatType_Plain;
+			m_text[line*m_lineWidth + i].chr = L' ';
 		}
-
-		txtBuf.insert(txtBuf.end(), count, L' ');
 	}
 
 	void RenderCharacter(int line, int column, wchar_t chr, unsigned int flags)
 	{
-		int x = column*CodePreview::s_charWidth;
-		int y = line*CodePreview::s_lineHeight;
+		if(column >= m_lineWidth)
+			return;
 
-		HFONT font = CodePreview::s_normalFont;
-		unsigned int bgColor = MetalBar::s_codePreviewBg;
-		unsigned int fgColor = MetalBar::s_codePreviewFg;
-
+		unsigned char format;
 		if(flags & TextFlag_Highlight)
-		{
-			// Draw highlighted text in "inverse video".
-			bgColor = MetalBar::s_codePreviewFg;
-			fgColor = MetalBar::s_codePreviewBg;
-		}
+			format = CodePreview::FormatType_Highlight;
 		else if(flags & TextFlag_Comment)
-			fgColor = MetalBar::s_commentColor;
+			format = CodePreview::FormatType_Comment;
 		else if(flags & TextFlag_Keyword)
-			font = CodePreview::s_boldFont;
+			format = CodePreview::FormatType_Keyword;
+		else
+			format = CodePreview::FormatType_Plain;
 
-		if( txtBuf.empty() || (font != txtBufFont) || (fgColor != txtBufFgColor) || (bgColor != txtBufBgColor) )
-		{
-			FlushBuffer();
-			txtBufX = x;
-			txtBufY = y;
-			txtBufFont = font;
-			txtBufFgColor = fgColor;
-			txtBufBgColor = bgColor;
-		}
-
-		txtBuf.push_back(chr);
+		m_text[line*m_lineWidth + column].format = format;
+		m_text[line*m_lineWidth + column].chr = chr;
 	}
 
-	HDC paintDC;
-	int imgWidth;
-
-	HBITMAP codeBmp;
-	unsigned int* codeBits;
-	int imgLines;
-	RECT imgRect;
-
-	std::vector<wchar_t> txtBuf;
-	int txtBufX;
-	int txtBufY;
-	unsigned int txtBufBgColor;
-	unsigned int txtBufFgColor;
-	HFONT txtBufFont;
+	std::vector<CodePreview::CharInfo>& m_text;
+	int m_lineWidth;
 };
 
 void CodePreview::Show(HWND bar, IVsTextView* view, IVsTextLines* buffer, const wchar_t* text, int numLines)
@@ -325,25 +210,18 @@ void CodePreview::Show(HWND bar, IVsTextView* view, IVsTextLines* buffer, const 
 	ClientToScreen(bar, &p);
 	m_parentYMax = p.y;
 
-	m_paintDC = CreateCompatibleDC(0);
-
-	//g_textDrawTime = 0;
-	//g_fillTime = 0;
-	//DWORD start = timeGetTime();
-
-	PreviewRenderOp renderOp(m_paintDC, m_wndWidth - HORIZ_MARGIN*2);
-	m_imgNumLines = RenderText(renderOp, view, buffer, text, numLines);
-	m_codeBmp = renderOp.codeBmp;
-
-	if(!m_imgNumLines)
+	if(!m_paintDC)
 	{
-		DeleteObject(m_codeBmp);
-		m_codeBmp = 0;
-		DeleteObject(m_paintDC);
-		m_paintDC = 0;
+		HDC wndDC = GetDC(m_hwnd);
+		m_paintDC = CreateCompatibleDC(wndDC);
+		m_codeBmp = CreateCompatibleBitmap(wndDC, m_wndWidth, m_wndHeight);
+		SelectObject(m_paintDC, m_codeBmp);
+		ReleaseDC(m_hwnd, wndDC);
 	}
 
-	//Log("Text: %d ms; Fill: %d ms; Total: %d ms\n", g_textDrawTime, g_fillTime, timeGetTime() - start);
+	int charsPerLine = (m_wndWidth - HORIZ_MARGIN*2) / s_charWidth;
+	PreviewRenderOp renderOp(m_text, charsPerLine);
+	m_imgNumLines = RenderText(renderOp, view, buffer, text, numLines);
 
 	ShowWindow(m_hwnd, SW_SHOW);
 }
@@ -351,22 +229,99 @@ void CodePreview::Show(HWND bar, IVsTextView* view, IVsTextLines* buffer, const 
 void CodePreview::Hide()
 {
 	ShowWindow(m_hwnd, SW_HIDE);
+}
 
-	if(m_codeBmp)
+void CodePreview::FlushTextBuf(std::vector<wchar_t>& buf, unsigned char format, int x, int y)
+{
+	int numChars = (int)buf.size();
+	if(numChars < 1)
+		return;
+
+	HFONT font = s_normalFont;
+	unsigned int fgColor = MetalBar::s_codePreviewFg;
+	unsigned int bgColor = MetalBar::s_codePreviewBg;
+
+	switch(format)
 	{
-		DeleteObject(m_codeBmp);
-		m_codeBmp = 0;
+		case FormatType_Plain:
+			break;
+		case FormatType_Comment:
+			fgColor = MetalBar::s_commentColor;
+			break;
+		case FormatType_Highlight:
+			bgColor = MetalBar::s_codePreviewFg;
+			fgColor = MetalBar::s_codePreviewBg;
+			break;
+		case FormatType_Keyword:
+			font = s_boldFont;
+			break;
 	}
 
-	if(m_paintDC)
-	{
-		DeleteDC(m_paintDC);
-		m_paintDC = 0;
-	}
+	SetBkColor(m_paintDC, RGB_TO_COLORREF(bgColor));
+	SetTextColor(m_paintDC, RGB_TO_COLORREF(fgColor));
+	SelectObject(m_paintDC, font);
+
+	RECT r = { 1, 1, m_wndWidth - 1, m_wndHeight - 1 };
+	ExtTextOutW(m_paintDC, x, y, ETO_CLIPPED, &r, &buf[0], numChars, 0);
+
+	buf.resize(0);
 }
 
 void CodePreview::Update(int y, int line)
 {
+	// Clear the back buffer and draw a border.
+	RECT r = { 0, 0, m_wndWidth, m_wndHeight };
+	StrokeRect(m_paintDC, MetalBar::s_codePreviewFg, r);
+	r.left = 1; r.right -= 1;
+	r.top = 1; r.bottom -= 1;
+	FillSolidRect(m_paintDC, MetalBar::s_codePreviewBg, r);
+
+	// Draw the text with buffering, because calling ExtTextOut() at each character is way too slow.
+	SetBkMode(m_paintDC, OPAQUE);
+	int charsPerLine = (m_wndWidth - HORIZ_MARGIN*2) / s_charWidth;
+	int numVisLines = (m_wndHeight-VERT_MARGIN*2) / s_lineHeight;
+	numVisLines = std::min(numVisLines, m_imgNumLines);
+
+	int startLine = (line - numVisLines / 2);
+	startLine = clamp(startLine, 0, m_imgNumLines - numVisLines);
+
+	std::vector<wchar_t> txtBuf;
+	txtBuf.reserve(charsPerLine);
+
+	int textY = VERT_MARGIN / 2;
+	for(int line = startLine; line < startLine + numVisLines; ++line, textY += s_lineHeight)
+	{
+		int textX = HORIZ_MARGIN / 2;
+
+		unsigned char currentFormat = FormatType_Plain;
+		int bufX = textX;
+
+		for(int col = 0; col < charsPerLine; ++col, textX += s_charWidth)
+		{
+			const CharInfo& info = m_text[line*charsPerLine + col];
+			if(info.format == FormatType_EOL)
+				break;
+
+			// Spaces can be merged with whatever format is currently active, except for highlight.
+			if( (info.chr == L' ') && (currentFormat != FormatType_Highlight) )
+			{
+				txtBuf.push_back(L' ');
+				continue;
+			}
+
+			if(info.format != currentFormat)
+			{
+				FlushTextBuf(txtBuf, currentFormat, bufX, textY);
+				currentFormat = info.format;
+				bufX = textX;
+			}
+
+			txtBuf.push_back(info.chr);
+		}
+
+		FlushTextBuf(txtBuf, currentFormat, bufX, textY);
+	}
+
 	// Update the window position.
 	y -= m_wndHeight / 2;
 	y = clamp(y, m_parentYMin, m_parentYMax - m_wndHeight);
@@ -374,59 +329,17 @@ void CodePreview::Update(int y, int line)
 	int x = m_rightEdge - m_wndWidth - 10;
 	SetWindowPos(m_hwnd, 0, x, y, 0, 0, SWP_NOSIZE|SWP_NOZORDER);
 
-	int numVisLines = (m_wndHeight-VERT_MARGIN*2) / s_lineHeight;
-	m_imgStartLine = (line - numVisLines / 2);
-	if(m_imgNumLines > numVisLines)
-		m_imgStartLine = clamp(m_imgStartLine, 0, m_imgNumLines - numVisLines);
-	else
-		m_imgStartLine = 0;
-
+	// Refresh.
 	InvalidateRect(m_hwnd, 0, TRUE);
 	UpdateWindow(m_hwnd);
 }
 
 void CodePreview::OnPaint(HDC dc)
 {
-	// Draw a border.
-	RECT r;
-	r.left = 0; r.right = m_wndWidth;
-	r.top = 0; r.bottom = m_wndHeight;
-	StrokeRect(dc, 0, r);
-
-	if(!m_paintDC || !m_imgNumLines)
-	{
-		r.left = 1; r.right -= 1;
-		r.top = 1; r.bottom -= 1;
-		FillSolidRect(dc, MetalBar::s_codePreviewBg, r);
-		SetBkMode(dc, TRANSPARENT);
-		SetTextColor(dc, MetalBar::s_codePreviewFg);
-		SelectObject(dc, s_boldFont);
-		static const char errMsg[] = "Not enough memory for preview";
-		ExtTextOutA(dc, HORIZ_MARGIN, VERT_MARGIN, ETO_CLIPPED, &r, errMsg, strlen(errMsg), 0);
+	if(!m_paintDC)
 		return;
-	}
 
-	int blitHeight = std::min(m_imgNumLines*s_lineHeight, m_wndHeight-VERT_MARGIN*2);
-
-	// Fill the area around the image.
-	r.left = 1; r.right = m_wndWidth - 1;
-	r.top = 1; r.bottom = VERT_MARGIN;
-	FillSolidRect(dc, MetalBar::s_codePreviewBg, r);
-
-	r.right = HORIZ_MARGIN;
-	r.top = VERT_MARGIN; r.bottom = m_wndHeight - 1;
-	FillSolidRect(dc, MetalBar::s_codePreviewBg, r);
-
-	r.left = m_wndWidth - HORIZ_MARGIN; r.right = m_wndWidth - 1;
-	r.top = VERT_MARGIN; r.bottom = m_wndHeight - 1;
-	FillSolidRect(dc, MetalBar::s_codePreviewBg, r);
-
-	r.left = HORIZ_MARGIN; r.right = m_wndWidth - HORIZ_MARGIN;
-	r.top = blitHeight + VERT_MARGIN;
-	FillSolidRect(dc, MetalBar::s_codePreviewBg, r);
-
-	// Blit the code image.
-	BitBlt(dc, HORIZ_MARGIN, VERT_MARGIN, m_wndWidth-HORIZ_MARGIN*2, blitHeight, m_paintDC, 0, m_imgStartLine*s_lineHeight, SRCCOPY);
+	BitBlt(dc, 0, 0, m_wndWidth, m_wndHeight, m_paintDC, 0, 0, SRCCOPY);
 }
 
 void CodePreview::Resize(int width, int height)
@@ -434,4 +347,12 @@ void CodePreview::Resize(int width, int height)
 	m_wndWidth = width*s_charWidth + HORIZ_MARGIN*2;
 	m_wndHeight = height*s_lineHeight + VERT_MARGIN*2;
 	SetWindowPos(m_hwnd, 0, 0, 0, m_wndWidth, m_wndHeight, SWP_NOMOVE|SWP_NOZORDER);
+
+	if(m_paintDC)
+	{
+		DeleteObject(m_codeBmp);
+		m_codeBmp = 0;
+		DeleteDC(m_paintDC);
+		m_paintDC = 0;
+	}
 }
