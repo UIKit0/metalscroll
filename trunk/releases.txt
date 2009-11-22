@@ -1,3 +1,17 @@
+ Version 1.0.7 (revision 67)
+-----------------------------
+  - added support for word wrapping
+  - middle click preview improvements:
+      - tabs are correctly expanded inside strings and comments
+      - multi-line comments are recognized
+      - it works with word wrapping and hidden text regions
+  - the current page marker has a minimum height of 15 pixels
+  - fixed: in the middle click preview, an escaped backslash right before the terminating quote of a string was parsed as an escaped quote, leading to incorrect highlighting in the following code
+  - fixed: // and /* inside strings caused the following text to be incorrectly painted as a comment on the bar
+  - fixed: placing a breakpoint on the last line in a file could lead to a crash
+  - fixed: horizontal dark lines sometimes appeared on the bar when the code image had to be scaled to fit
+  - fixed: the add-in didn't work if the horizontal scrollbar of the text editor was turned off in the VS options
+
  Version 1.0.6 (revision 52)
 -----------------------------
   - the scrollbar only colors C-style comments in C-like language files (i.e. C, C++ and C#)
