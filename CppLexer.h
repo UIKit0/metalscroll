@@ -24,5 +24,6 @@ enum CharClass
 };
 
 bool		IsCppIdSeparator(wchar_t chr);
+bool		IsCppIdStart(wchar_t chr);
 bool		IsCppKeyword(const wchar_t* str, unsigned int len);
 CharClass	GetCharClass(wchar_t chr);

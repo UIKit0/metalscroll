@@ -223,6 +223,11 @@ bool IsCppIdSeparator(wchar_t chr)
 	}
 }
 
+bool IsCppIdStart(wchar_t chr)
+{
+	return (GetCharClass(chr) == CharClass_Letter) || (chr == L'_');
+}
+
 CharClass GetCharClass(wchar_t chr)
 {
 	if( (chr >= L'0') && (chr <= L'9') )

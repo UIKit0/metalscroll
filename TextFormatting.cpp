@@ -302,6 +302,8 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 		CommentType_SingleLine,
 		CommentType_MultiLine
 	} commentType = CommentType_None;
+	bool inKeyword = false;
+	bool inString = false;
 
 	// Here "virtual" refers to rendered coordinates, which can differ from real text coordinates due to word wrapping,
 	// hidden text regions and tabs.
@@ -364,6 +366,8 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 			{
 				++realLine;
 				realColumn = 0;
+				inKeyword = false;
+				inString = false;
 
 				// In case of CRLF, eat the next character too.
 				if( (chr[0] == L'\r') && (chr[1] == L'\n') )
@@ -387,16 +391,47 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 			switch(commentType)
 			{
 				case CommentType_None:
-					if( isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'/') )
+					if(!isCppLikeLanguage)
+						break;
+
+					if( (chr[0] == L'/') && (chr[1] == L'/') )
 					{
 						textFlags |= TextFlag_Comment;
 						commentType = CommentType_SingleLine;
+						inKeyword = false;
 					}
-					else if( isCppLikeLanguage && (chr[0] == L'/') && (chr[1] == L'*') )
+					else if( (chr[0] == L'/') && (chr[1] == L'*') )
 					{
 						textFlags |= TextFlag_Comment;
 						commentType = CommentType_MultiLine;
+						inKeyword = false;
 					}
+					else if(chr[0] == L'"')
+					{
+						inKeyword = false;
+						if(inString)
+						{
+							const wchar_t* backslashStart = chr - 1;
+							while( (backslashStart >= text) && (*backslashStart == L'\\') )
+								--backslashStart;
+							int numBackslashes = int(chr - backslashStart - 1);
+							if(numBackslashes % 2 == 0)
+								inString = false;
+						}
+						else
+							inString = true;
+					}
+					else if(!inKeyword && !inString && IsCppIdStart(chr[0]) && ((chr == text) || IsCppIdSeparator(chr[-1])) )
+					{
+						inKeyword = true;
+						const wchar_t* keywordEnd = chr + 1;
+						while(!IsCppIdSeparator(*keywordEnd))
+							++keywordEnd;
+						int len = int(keywordEnd - chr);
+						inKeyword = IsCppKeyword(chr, len);
+					}
+					else if(inKeyword && IsCppIdSeparator(chr[0]))
+						inKeyword = false;
 					break;
 
 				case CommentType_SingleLine:
@@ -410,6 +445,9 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 					break;
 			}
 
+			if(inKeyword)
+				textFlags |= TextFlag_Keyword;
+
 			// Advance the highlight interval, if needed.
 			while(crHighlight && (realColumn >= (int)crHighlight->end))
 				crHighlight = crHighlight->next;
@@ -419,10 +457,12 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 				textFlags |= TextFlag_Highlight;
 
 			if(isLineVisible)
-				renderOp.RenderCharacters(virtualLine, virtualColumn, chr, 1, textFlags);
+				renderOp.RenderCharacter(virtualLine, virtualColumn, *chr, textFlags);
 		}
 		else
 		{
+			inKeyword = false;
+
 			if(*chr == L'\t')
 				numChars = tabSize - (virtualColumn % tabSize);
 

@@ -508,22 +508,22 @@ struct BarRenderOp : public RenderOperator
 			imgBuffer[line*MetalBar::s_barWidth + i] = MetalBar::s_whitespaceColor;
 	}
 
-	void RenderCharacters(int line, int column, const wchar_t* text, int len, unsigned int flags)
+	void RenderCharacter(int line, int column, wchar_t chr, unsigned int flags)
 	{
-		for(int i = column; (i < column + len) && (i < (int)MetalBar::s_barWidth); ++i)
-		{
-			unsigned int color;
-			if(flags & TextFlag_Highlight)
-				color = MetalBar::s_matchColor;
-			else if(flags & TextFlag_Comment)
-				color = MetalBar::s_commentColor;
-			else if( (text[i - column] >= 'A') && (text[i - column] <= 'Z') )
-				color = MetalBar::s_upperCaseColor;
-			else
-				color = MetalBar::s_characterColor;
+		if(column >= (int)MetalBar::s_barWidth)
+			return;
 
-			imgBuffer[line*MetalBar::s_barWidth + i] = color;
-		}
+		unsigned int color;
+		if(flags & TextFlag_Highlight)
+			color = MetalBar::s_matchColor;
+		else if(flags & TextFlag_Comment)
+			color = MetalBar::s_commentColor;
+		else if( (chr >= 'A') && (chr <= 'Z') )
+			color = MetalBar::s_upperCaseColor;
+		else
+			color = MetalBar::s_characterColor;
+
+		imgBuffer[line*MetalBar::s_barWidth + column] = color;
 	}
 
 	std::vector<unsigned int>& imgBuffer;
