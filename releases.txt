@@ -1,4 +1,4 @@
- Version 1.0.7 (revision 67)
+ Version 1.0.7 (revision 68)
 -----------------------------
   - added support for word wrapping
   - middle click preview improvements:

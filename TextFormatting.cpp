@@ -396,13 +396,13 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 					if(!isCppLikeLanguage)
 						break;
 
-					if( (chr[0] == L'/') && (chr[1] == L'/') )
+					if( !inString && (chr[0] == L'/') && (chr[1] == L'/') )
 					{
 						textFlags |= TextFlag_Comment;
 						commentType = CommentType_SingleLine;
 						inKeyword = false;
 					}
-					else if( (chr[0] == L'/') && (chr[1] == L'*') )
+					else if( !inString && (chr[0] == L'/') && (chr[1] == L'*') )
 					{
 						textFlags |= TextFlag_Comment;
 						commentType = CommentType_MultiLine;
@@ -425,7 +425,6 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 					}
 					else if(!inKeyword && !inString && IsCppIdStart(chr[0]) && ((chr == text) || IsCppIdSeparator(chr[-1])) )
 					{
-						inKeyword = true;
 						const wchar_t* keywordEnd = chr + 1;
 						while(!IsCppIdSeparator(*keywordEnd))
 							++keywordEnd;
