@@ -29,5 +29,6 @@ void FlipScaleImageVertically(unsigned int* dest, int destHeight, const unsigned
 
 void Log(const char* fmt, ...);
 
+// Warning: these two things are horribly slow. Only use them for small areas.
 void FillSolidRect(HDC hdc, unsigned int color, const RECT& r);
 void StrokeRect(HDC hdc, unsigned int color, const RECT& r);
