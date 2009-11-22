@@ -39,6 +39,21 @@ private:
 	static int					s_charWidth;
 	static int					s_lineHeight;
 
+	enum FormatType
+	{
+		FormatType_Plain,
+		FormatType_Keyword,
+		FormatType_Comment,
+		FormatType_Highlight,
+		FormatType_EOL
+	};
+
+	struct CharInfo
+	{
+		wchar_t			chr;
+		unsigned char	format;
+	};
+
 	HWND						m_hwnd;
 	HDC							m_paintDC;
 	HBITMAP						m_codeBmp;
@@ -47,16 +62,12 @@ private:
 	int							m_rightEdge;
 	int							m_parentYMin;
 	int							m_parentYMax;
+	std::vector<CharInfo>		m_text;
 	int							m_imgNumLines;
-	int							m_imgStartLine;
 
 	static LRESULT FAR PASCAL	WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
-	
-	wchar_t*					EatWhitespace(wchar_t* text, int* x, int* y);
-	wchar_t*					EatString(wchar_t* text, int* x);
-	wchar_t*					EatComment(wchar_t* text, int* x);
-	wchar_t*					EatIdentifier(wchar_t* text, int* x);
 	void						OnPaint(HDC dc);
+	void						FlushTextBuf(std::vector<wchar_t>& buf, unsigned char format, int x, int y);
 
 	friend struct PreviewRenderOp;
 };
