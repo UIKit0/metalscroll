@@ -344,9 +344,11 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 						// VS moves the entire word on the next line unless it starts on the 1st or 2nd column.
 						if(virtualColumn - currentWordLen > 1)
 						{
-							// Rewind the text so we can draw the entire wrapped word on the next line. Also, move back
-							// the virtual column so that the code below erases the part of the word we've already painted.
+							// Rewind the text so we can draw the entire wrapped word on the next line.
 							chr -= currentWordLen;
+							realColumn -= currentWordLen;
+							// Move back the virtual column so that the end of line handler can erase the
+							// part of the word we've already painted.
 							virtualColumn -= currentWordLen;
 						}
 					}
