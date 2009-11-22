@@ -130,6 +130,10 @@ void CodePreview::Create(HWND parent, int width, int height)
 	m_hwnd = CreateWindowA(s_className, "CodePreview", style, 0, 0, m_wndWidth, m_wndHeight, parent, 0, _AtlModule.GetResourceInstance(), this);
 }
 
+//static int g_textDrawTime;
+//static int g_fillTime;
+//#pragma comment(lib, "winmm.lib")
+
 struct PreviewRenderOp : RenderOperator
 {
 	PreviewRenderOp(HDC _paintDC, int _imgWidth) : paintDC(_paintDC), imgWidth(_imgWidth) {}
@@ -147,10 +151,13 @@ struct PreviewRenderOp : RenderOperator
 		*bmp = CreateDIBSection(0, &bi, DIB_RGB_COLORS, bits, 0, 0);
 	}
 
-	void Init(int numLines)
+	bool Init(int numLines)
 	{
 		imgLines = numLines;
 		AllocImg(imgLines, &codeBmp, (void**)&codeBits);
+		if(!codeBmp || !codeBits)
+			return false;
+
 		SelectObject(paintDC, codeBmp);
 		SetBkMode(paintDC, OPAQUE);
 
@@ -163,6 +170,8 @@ struct PreviewRenderOp : RenderOperator
 		txtBufY = 0;
 		txtBufFgColor = 0;
 		txtBufBgColor = 0;
+
+		return true;
 	}
 
 	void FlushBuffer()
@@ -171,39 +180,55 @@ struct PreviewRenderOp : RenderOperator
 		if(numChars < 1)
 			return;
 
+		//DWORD start = timeGetTime();
+
 		SetBkColor(paintDC, RGB_TO_COLORREF(txtBufBgColor));
 		SetTextColor(paintDC, RGB_TO_COLORREF(txtBufFgColor));
 		SelectObject(paintDC, txtBufFont);
 		ExtTextOutW(paintDC, txtBufX, txtBufY, ETO_CLIPPED, &imgRect, &txtBuf[0], (int)numChars, 0);
 		txtBuf.resize(0);
+
+		//g_textDrawTime += timeGetTime() - start;
 	}
 
-	void EndLine(int line, int lastColumn, unsigned int /*lineFlags*/, bool textEnd)
+	void FillRestOfLine(int line, int lastColumn)
+	{
+		int x = lastColumn * CodePreview::s_charWidth;
+		if(x >= imgWidth)
+			return;
+
+		int y = (imgLines - line - 1) * CodePreview::s_lineHeight;
+		unsigned int* start = codeBits + y*imgWidth + x;
+		const unsigned int* end = codeBits + (y + 1)*imgWidth;
+		for(int i = 0; i < CodePreview::s_lineHeight; ++i)
+		{
+			for(unsigned int* pixel = start; pixel < end; ++pixel)
+				*pixel = MetalBar::s_codePreviewBg;
+
+			start += imgWidth;
+			end += imgWidth;
+		}
+	}
+
+	bool EndLine(int line, int lastColumn, unsigned int /*lineFlags*/, bool textEnd)
 	{
 		FlushBuffer();
 
 		// Fill the rest of the line with the background color.
-		int x = lastColumn * CodePreview::s_charWidth;
-		int y = (imgLines - line - 1) * CodePreview::s_lineHeight;
-		if(x < imgWidth)
-		{
-			for(int i = y; i < y + CodePreview::s_lineHeight; ++i)
-			{
-				for(int j = x; j < imgWidth; ++j)
-				{
-					codeBits[i*imgWidth + j] = MetalBar::s_codePreviewBg;
-				}
-			}
-		}
+		//DWORD start = timeGetTime();
+		FillRestOfLine(line, lastColumn);
+		//g_fillTime += timeGetTime() - start;
 
 		if(textEnd || (line < imgLines - 1))
-			return;
+			return true;
 
 		// We have more lines than we anticipated, due to word wrapping. Make a larger image.
 		HBITMAP newBmp;
 		unsigned int* newBits;
-		int newNumLines = imgLines + imgLines / 2;
+		int newNumLines = std::max(imgLines + imgLines / 10, imgLines + 10);
 		AllocImg(newNumLines, &newBmp, (void**)&newBits);
+		if(!newBmp || !newBits)
+			return false;
 
 		// Copy the old image into the new one. Since BMPs are upside down, we must offset the destination.
 		int offset = (newNumLines - imgLines)*CodePreview::s_lineHeight*imgWidth;
@@ -216,6 +241,8 @@ struct PreviewRenderOp : RenderOperator
 		codeBits = newBits;
 		imgLines = newNumLines;
 		imgRect.bottom = imgLines*CodePreview::s_lineHeight;
+
+		return true;
 	}
 
 	void RenderSpaces(int line, int column, int count)
@@ -300,9 +327,23 @@ void CodePreview::Show(HWND bar, IVsTextView* view, IVsTextLines* buffer, const 
 
 	m_paintDC = CreateCompatibleDC(0);
 
+	//g_textDrawTime = 0;
+	//g_fillTime = 0;
+	//DWORD start = timeGetTime();
+
 	PreviewRenderOp renderOp(m_paintDC, m_wndWidth - HORIZ_MARGIN*2);
 	m_imgNumLines = RenderText(renderOp, view, buffer, text, numLines);
 	m_codeBmp = renderOp.codeBmp;
+
+	if(!m_imgNumLines)
+	{
+		DeleteObject(m_codeBmp);
+		m_codeBmp = 0;
+		DeleteObject(m_paintDC);
+		m_paintDC = 0;
+	}
+
+	//Log("Text: %d ms; Fill: %d ms; Total: %d ms\n", g_textDrawTime, g_fillTime, timeGetTime() - start);
 
 	ShowWindow(m_hwnd, SW_SHOW);
 }
@@ -346,14 +387,24 @@ void CodePreview::Update(int y, int line)
 
 void CodePreview::OnPaint(HDC dc)
 {
-	if(!m_paintDC)
-		return;
-
 	// Draw a border.
 	RECT r;
 	r.left = 0; r.right = m_wndWidth;
 	r.top = 0; r.bottom = m_wndHeight;
 	StrokeRect(dc, 0, r);
+
+	if(!m_paintDC || !m_imgNumLines)
+	{
+		r.left = 1; r.right -= 1;
+		r.top = 1; r.bottom -= 1;
+		FillSolidRect(dc, MetalBar::s_codePreviewBg, r);
+		SetBkMode(dc, TRANSPARENT);
+		SetTextColor(dc, MetalBar::s_codePreviewFg);
+		SelectObject(dc, s_boldFont);
+		static const char errMsg[] = "Not enough memory for preview";
+		ExtTextOutA(dc, HORIZ_MARGIN, VERT_MARGIN, ETO_CLIPPED, &r, errMsg, strlen(errMsg), 0);
+		return;
+	}
 
 	int blitHeight = std::min(m_imgNumLines*s_lineHeight, m_wndHeight-VERT_MARGIN*2);
 

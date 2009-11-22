@@ -294,7 +294,8 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 	HighlightList highlightStorage;
 	GetHighlights(lines, buffer, highlightStorage);
 
-	renderOp.Init(numLines);
+	if(!renderOp.Init(numLines))
+		return 0;
 
 	enum CommentType
 	{
@@ -352,7 +353,8 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 					}
 				}
 
-				renderOp.EndLine(virtualLine, virtualColumn, lines[realLine].flags, isTextEnd);
+				if(!renderOp.EndLine(virtualLine, virtualColumn, lines[realLine].flags, isTextEnd))
+					return 0;
 
 				// Advance the virtual line.
 				virtualColumn = 0;
