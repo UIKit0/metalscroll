@@ -42,18 +42,6 @@ void CodePreview::Destroy()
 {
 	Hide();
 
-	if(m_codeBmp)
-	{
-		DeleteObject(m_codeBmp);
-		m_codeBmp = 0;
-	}
-
-	if(m_paintDC)
-	{
-		DeleteDC(m_paintDC);
-		m_paintDC = 0;
-	}
-
 	if(m_hwnd)
 	{
 		DestroyWindow(m_hwnd);
@@ -229,6 +217,22 @@ void CodePreview::Show(HWND bar, IVsTextView* view, IVsTextLines* buffer, const 
 void CodePreview::Hide()
 {
 	ShowWindow(m_hwnd, SW_HIDE);
+	
+	// Free the memory used by the text buffer.
+	m_text.clear();
+
+	// Free the GDI objects.
+	if(m_codeBmp)
+	{
+		DeleteObject(m_codeBmp);
+		m_codeBmp = 0;
+	}
+
+	if(m_paintDC)
+	{
+		DeleteDC(m_paintDC);
+		m_paintDC = 0;
+	}
 }
 
 void CodePreview::FlushTextBuf(std::vector<wchar_t>& buf, unsigned char format, int x, int y)
