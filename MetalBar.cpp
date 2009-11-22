@@ -658,6 +658,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	float normFact = (m_numLines < barHeight) ? 1.0f : 1.0f * barHeight / range;
 	int normalizedCursor = int(cursor * normFact);
 	int normalizedPage = int(m_pageSize * normFact);
+	normalizedPage = std::max(15, normalizedPage);
 	if(normalizedPage > barHeight)
 		normalizedPage = barHeight;
 	if(clRect.top + normalizedCursor + normalizedPage > clRect.bottom)
