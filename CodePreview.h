@@ -27,9 +27,9 @@ public:
 	void						Create(HWND parent, int width, int height);
 	void						Destroy();
 
-	void						Show(HWND bar);
+	void						Show(HWND bar, IVsTextView* view, IVsTextLines* buffer, const wchar_t* text, int numLines);
 	void						Hide();
-	void						Update(int y, wchar_t* text, int tabSize, const wchar_t* highlightWord, bool doSyntaxHighlight);
+	void						Update(int y, int line);
 	void						Resize(int width, int height);
 
 private:
@@ -42,12 +42,13 @@ private:
 	HWND						m_hwnd;
 	HDC							m_paintDC;
 	HBITMAP						m_codeBmp;
-	int							m_width;
-	int							m_height;
+	int							m_wndWidth;
+	int							m_wndHeight;
 	int							m_rightEdge;
 	int							m_parentYMin;
 	int							m_parentYMax;
-	int							m_tabSize;
+	int							m_imgNumLines;
+	int							m_imgStartLine;
 
 	static LRESULT FAR PASCAL	WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 	
@@ -57,4 +58,5 @@ private:
 	wchar_t*					EatIdentifier(wchar_t* text, int* x);
 	void						OnPaint(HDC dc);
 
+	friend struct PreviewRenderOp;
 };

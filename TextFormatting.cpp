@@ -411,7 +411,7 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 			}
 
 			// Advance the highlight interval, if needed.
-			while(crHighlight && (realColumn > (int)crHighlight->end))
+			while(crHighlight && (realColumn >= (int)crHighlight->end))
 				crHighlight = crHighlight->next;
 
 			// Override the color with the match color if inside a marker.
@@ -419,7 +419,7 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 				textFlags |= TextFlag_Highlight;
 
 			if(isLineVisible)
-				renderOp.RenderCharacters(virtualColumn, chr, 1, textFlags);
+				renderOp.RenderCharacters(virtualLine, virtualColumn, chr, 1, textFlags);
 		}
 		else
 		{
@@ -427,7 +427,7 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 				numChars = tabSize - (virtualColumn % tabSize);
 
 			if(isLineVisible)
-				renderOp.RenderSpaces(virtualColumn, numChars);
+				renderOp.RenderSpaces(virtualLine, virtualColumn, numChars);
 		}
 
 		++realColumn;

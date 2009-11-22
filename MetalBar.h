@@ -91,6 +91,7 @@ private:
 
 	void							OnDrag(bool initial);
 	void							OnTrackPreview();
+	void							ShowCodePreview();
 	void							OnPaint(HDC ctrlDC);
 	void							AdjustSize(unsigned int requiredWidth);
 	void							RemoveWndProcHook();

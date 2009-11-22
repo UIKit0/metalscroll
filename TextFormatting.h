@@ -45,8 +45,8 @@ struct RenderOperator
 {
 	virtual void Init(int numLines) = 0;
 	virtual void EndLine(int line, int lastColumn, unsigned int lineFlags, bool textEnd) = 0;
-	virtual void RenderSpaces(int column, int count) = 0;
-	virtual void RenderCharacters(int column, const wchar_t* text, int len, unsigned int flags) = 0;
+	virtual void RenderSpaces(int line, int column, int count) = 0;
+	virtual void RenderCharacters(int line, int column, const wchar_t* text, int len, unsigned int flags) = 0;
 };
 
 int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer, const wchar_t* text, int numLines);
