@@ -156,10 +156,30 @@ struct PreviewRenderOp : RenderOperator
 		imgRect.top = 0; imgRect.bottom = imgLines*CodePreview::s_lineHeight;
 		FillSolidRect(paintDC, MetalBar::s_codePreviewBg, imgRect);
 		SetBkMode(paintDC, TRANSPARENT);
+
+		txtBuf.reserve(imgWidth / CodePreview::s_charWidth);
+		txtBufFont = 0;
+		txtBufX = 0;
+		txtBufY = 0;
+		txtBufColor = 0;
+	}
+
+	void FlushBuffer()
+	{
+		int numChars = (int)txtBuf.size();
+		if(numChars < 1)
+			return;
+
+		SetTextColor(paintDC, RGB_TO_COLORREF(txtBufColor));
+		SelectObject(paintDC, txtBufFont);
+		ExtTextOutW(paintDC, txtBufX, txtBufY, ETO_CLIPPED, &imgRect, &txtBuf[0], (int)numChars, 0);
+		txtBuf.resize(0);
 	}
 
 	void EndLine(int line, int lastColumn, unsigned int /*lineFlags*/, bool textEnd)
 	{
+		FlushBuffer();
+
 		RECT r;
 		r.left = lastColumn*CodePreview::s_charWidth; r.right = imgWidth;
 		r.top = line*CodePreview::s_lineHeight; r.bottom = r.top + CodePreview::s_lineHeight;
@@ -193,15 +213,23 @@ struct PreviewRenderOp : RenderOperator
 		imgRect.bottom = imgLines*CodePreview::s_lineHeight;
 	}
 
-	void RenderSpaces(int /*line*/, int /*column*/, int /*count*/) {}
+	void RenderSpaces(int line, int column, int count)
+	{
+		if(txtBuf.empty())
+		{
+			txtBufX = column*CodePreview::s_charWidth;
+			txtBufY = line*CodePreview::s_lineHeight;
+			txtBufFont = CodePreview::s_normalFont;
+			txtBufColor = MetalBar::s_codePreviewFg;
+		}
+
+		txtBuf.insert(txtBuf.end(), count, L' ');
+	}
 
 	void RenderCharacter(int line, int column, wchar_t chr, unsigned int flags)
 	{
-		RECT wordRect;
-		wordRect.left = column*CodePreview::s_charWidth;
-		wordRect.right = wordRect.left + CodePreview::s_charWidth;
-		wordRect.top = line*CodePreview::s_lineHeight;
-		wordRect.bottom = wordRect.top + CodePreview::s_lineHeight;
+		int x = column*CodePreview::s_charWidth;
+		int y = line*CodePreview::s_lineHeight;
 
 		HFONT font = CodePreview::s_normalFont;
 		unsigned int fgColor = MetalBar::s_codePreviewFg;
@@ -209,6 +237,7 @@ struct PreviewRenderOp : RenderOperator
 		if(flags & TextFlag_Highlight)
 		{
 			// Draw highlighted text in "inverse video".
+			RECT wordRect = { x, y, x + CodePreview::s_charWidth, y + CodePreview::s_lineHeight };
 			FillSolidRect(paintDC, MetalBar::s_codePreviewFg, wordRect);
 			fgColor = MetalBar::s_codePreviewBg;
 		}
@@ -217,9 +246,16 @@ struct PreviewRenderOp : RenderOperator
 		else if(flags & TextFlag_Keyword)
 			font = CodePreview::s_boldFont;
 
-		SetTextColor(paintDC, RGB_TO_COLORREF(fgColor));
-		SelectObject(paintDC, font);
-		ExtTextOutW(paintDC, wordRect.left, wordRect.top, ETO_CLIPPED, &imgRect, &chr, 1, 0);
+		if( txtBuf.empty() || (font != txtBufFont) || (fgColor != txtBufColor) )
+		{
+			FlushBuffer();
+			txtBufX = x;
+			txtBufY = y;
+			txtBufFont = font;
+			txtBufColor = fgColor;
+		}
+
+		txtBuf.push_back(chr);
 	}
 
 	HDC paintDC;
@@ -229,6 +265,12 @@ struct PreviewRenderOp : RenderOperator
 	unsigned int* codeBits;
 	int imgLines;
 	RECT imgRect;
+
+	std::vector<wchar_t> txtBuf;
+	int txtBufX;
+	int txtBufY;
+	unsigned int txtBufColor;
+	HFONT txtBufFont;
 };
 
 void CodePreview::Show(HWND bar, IVsTextView* view, IVsTextLines* buffer, const wchar_t* text, int numLines)
