@@ -152,16 +152,17 @@ struct PreviewRenderOp : RenderOperator
 		imgLines = numLines;
 		AllocImg(imgLines, &codeBmp, (void**)&codeBits);
 		SelectObject(paintDC, codeBmp);
+		SetBkMode(paintDC, OPAQUE);
+
 		imgRect.left = 0; imgRect.right = imgWidth;
 		imgRect.top = 0; imgRect.bottom = imgLines*CodePreview::s_lineHeight;
-		FillSolidRect(paintDC, MetalBar::s_codePreviewBg, imgRect);
-		SetBkMode(paintDC, TRANSPARENT);
 
 		txtBuf.reserve(imgWidth / CodePreview::s_charWidth);
 		txtBufFont = 0;
 		txtBufX = 0;
 		txtBufY = 0;
-		txtBufColor = 0;
+		txtBufFgColor = 0;
+		txtBufBgColor = 0;
 	}
 
 	void FlushBuffer()
@@ -170,7 +171,8 @@ struct PreviewRenderOp : RenderOperator
 		if(numChars < 1)
 			return;
 
-		SetTextColor(paintDC, RGB_TO_COLORREF(txtBufColor));
+		SetBkColor(paintDC, RGB_TO_COLORREF(txtBufBgColor));
+		SetTextColor(paintDC, RGB_TO_COLORREF(txtBufFgColor));
 		SelectObject(paintDC, txtBufFont);
 		ExtTextOutW(paintDC, txtBufX, txtBufY, ETO_CLIPPED, &imgRect, &txtBuf[0], (int)numChars, 0);
 		txtBuf.resize(0);
@@ -180,11 +182,19 @@ struct PreviewRenderOp : RenderOperator
 	{
 		FlushBuffer();
 
-		RECT r;
-		r.left = lastColumn*CodePreview::s_charWidth; r.right = imgWidth;
-		r.top = line*CodePreview::s_lineHeight; r.bottom = r.top + CodePreview::s_lineHeight;
-		if(r.left < imgWidth)
-			FillSolidRect(paintDC, MetalBar::s_codePreviewBg, r);
+		// Fill the rest of the line with the background color.
+		int x = lastColumn * CodePreview::s_charWidth;
+		int y = (imgLines - line - 1) * CodePreview::s_lineHeight;
+		if(x < imgWidth)
+		{
+			for(int i = y; i < y + CodePreview::s_lineHeight; ++i)
+			{
+				for(int j = x; j < imgWidth; ++j)
+				{
+					codeBits[i*imgWidth + j] = MetalBar::s_codePreviewBg;
+				}
+			}
+		}
 
 		if(textEnd || (line < imgLines - 1))
 			return;
@@ -199,13 +209,8 @@ struct PreviewRenderOp : RenderOperator
 		int offset = (newNumLines - imgLines)*CodePreview::s_lineHeight*imgWidth;
 		memcpy(newBits + offset, codeBits, imgLines*CodePreview::s_lineHeight*imgWidth*4);
 
-		// Fill the new area with the background color.
-		SelectObject(paintDC, newBmp);
-		r.left = 0; r.right = imgWidth;
-		r.top = imgLines*CodePreview::s_lineHeight; r.bottom = newNumLines*CodePreview::s_lineHeight;
-		FillSolidRect(paintDC, MetalBar::s_codePreviewBg, r);
-
 		// Delete the old image and replace it with the new one.
+		SelectObject(paintDC, newBmp);
 		DeleteObject(codeBmp);
 		codeBmp = newBmp;
 		codeBits = newBits;
@@ -220,7 +225,8 @@ struct PreviewRenderOp : RenderOperator
 			txtBufX = column*CodePreview::s_charWidth;
 			txtBufY = line*CodePreview::s_lineHeight;
 			txtBufFont = CodePreview::s_normalFont;
-			txtBufColor = MetalBar::s_codePreviewFg;
+			txtBufBgColor = MetalBar::s_codePreviewBg;
+			txtBufFgColor = MetalBar::s_codePreviewFg;
 		}
 
 		txtBuf.insert(txtBuf.end(), count, L' ');
@@ -232,13 +238,13 @@ struct PreviewRenderOp : RenderOperator
 		int y = line*CodePreview::s_lineHeight;
 
 		HFONT font = CodePreview::s_normalFont;
+		unsigned int bgColor = MetalBar::s_codePreviewBg;
 		unsigned int fgColor = MetalBar::s_codePreviewFg;
 
 		if(flags & TextFlag_Highlight)
 		{
 			// Draw highlighted text in "inverse video".
-			RECT wordRect = { x, y, x + CodePreview::s_charWidth, y + CodePreview::s_lineHeight };
-			FillSolidRect(paintDC, MetalBar::s_codePreviewFg, wordRect);
+			bgColor = MetalBar::s_codePreviewFg;
 			fgColor = MetalBar::s_codePreviewBg;
 		}
 		else if(flags & TextFlag_Comment)
@@ -246,13 +252,14 @@ struct PreviewRenderOp : RenderOperator
 		else if(flags & TextFlag_Keyword)
 			font = CodePreview::s_boldFont;
 
-		if( txtBuf.empty() || (font != txtBufFont) || (fgColor != txtBufColor) )
+		if( txtBuf.empty() || (font != txtBufFont) || (fgColor != txtBufFgColor) || (bgColor != txtBufBgColor) )
 		{
 			FlushBuffer();
 			txtBufX = x;
 			txtBufY = y;
 			txtBufFont = font;
-			txtBufColor = fgColor;
+			txtBufFgColor = fgColor;
+			txtBufBgColor = bgColor;
 		}
 
 		txtBuf.push_back(chr);
@@ -269,7 +276,8 @@ struct PreviewRenderOp : RenderOperator
 	std::vector<wchar_t> txtBuf;
 	int txtBufX;
 	int txtBufY;
-	unsigned int txtBufColor;
+	unsigned int txtBufBgColor;
+	unsigned int txtBufFgColor;
 	HFONT txtBufFont;
 };
 
