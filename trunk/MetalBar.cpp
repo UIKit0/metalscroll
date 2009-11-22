@@ -200,34 +200,24 @@ void MetalBar::OnTrackPreview()
 	GetWindowRect(m_hwnd, &clRect);
 
 	// Determine the line, taking care of the case when the code image is scaled.
-	int codeImgHeight = std::min((int)m_backBufferHeight, (int)m_numLines);
-	int clampedY = clamp<int>(mouse.y - clRect.top, 0, codeImgHeight);
+	int pixelY = clamp<int>(mouse.y - clRect.top, 0, m_codeImgHeight);
+	int line = m_codeImgHeight >= m_numLines ? pixelY : int(1.0f * pixelY * m_numLines / m_codeImgHeight);
 
-	int line;
-	if((int)m_backBufferHeight < m_numLines)
-		line = int(1.0f * clampedY * m_numLines / m_backBufferHeight);
-	else
-		line = clampedY;
-	
+	g_codePreviewWnd.Update(clRect.top + pixelY, line);
+}
+
+void MetalBar::ShowCodePreview()
+{
 	CComPtr<IVsTextLines> buffer;
-	HRESULT hr = m_view->GetBuffer(&buffer);
-	if(FAILED(hr) || !buffer)
-		return;
-
-	long numLines;
-	hr = buffer->GetLineCount(&numLines);
-	if(FAILED(hr))
-		return;
-
 	CComBSTR text;
-	int minLine = std::max<int>(0, line - s_codePreviewHeight / 2);
-	int maxLine = std::min<int>((int)numLines - 1, minLine + s_codePreviewHeight);
-	hr = buffer->GetLineText(minLine, 0, maxLine, 0, &text);
-	if(FAILED(hr) || !text)
+	long numLines;
+	if(!GetBufferAndText(&buffer, &text, &numLines))
 		return;
 
-	//FIXME
-	//g_codePreviewWnd.Update(clRect.top + clampedY, text, m_tabSize, m_highlightWord, m_isCppLikeLanguage);
+	g_codePreviewWnd.Show(m_hwnd, m_view, buffer, text, numLines);
+
+	g_previewShown = true;
+	OnTrackPreview();
 }
 
 LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -363,9 +353,7 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		case WM_MBUTTONDOWN:
 		{
 			SetCapture(m_hwnd);
-			g_previewShown = true;
-			OnTrackPreview();
-			g_codePreviewWnd.Show(m_hwnd);
+			ShowCodePreview();
 			return 0;
 		}
 
@@ -495,15 +483,14 @@ struct BarRenderOp : public RenderOperator
 	{
 		imgBuffer.reserve(numLines*MetalBar::s_barWidth);
 		imgBuffer.resize(MetalBar::s_barWidth);
-		pixel = &imgBuffer[0];
-		markedLines.reserve(std::max(10, numLines / 10));
+		markedLines.reserve(numLines);
 	}
 
 	void EndLine(int line, int lastColumn, unsigned int lineFlags, bool textEnd)
 	{
 		// Fill the remaining pixels with the whitespace color.
 		for(int i = lastColumn; i < (int)MetalBar::s_barWidth; ++i)
-			pixel[i] = MetalBar::s_whitespaceColor;
+			imgBuffer[line*MetalBar::s_barWidth + i] = MetalBar::s_whitespaceColor;
 
 		if(lineFlags)
 			markedLines.push_back(std::pair<unsigned int, unsigned int>(line, lineFlags));
@@ -512,34 +499,35 @@ struct BarRenderOp : public RenderOperator
 		{
 			// Advance the image pointer.
 			imgBuffer.resize((line + 2) * MetalBar::s_barWidth);
-			pixel = &imgBuffer[(line + 1) * MetalBar::s_barWidth];
 		}
 	}
 
-	void RenderSpaces(int column, int count)
+	void RenderSpaces(int line, int column, int count)
 	{
 		for(int i = column; (i < column + count) && (i < (int)MetalBar::s_barWidth); ++i)
-			pixel[i] = MetalBar::s_whitespaceColor;
+			imgBuffer[line*MetalBar::s_barWidth + i] = MetalBar::s_whitespaceColor;
 	}
 
-	void RenderCharacters(int column, const wchar_t* text, int len, unsigned int flags)
+	void RenderCharacters(int line, int column, const wchar_t* text, int len, unsigned int flags)
 	{
 		for(int i = column; (i < column + len) && (i < (int)MetalBar::s_barWidth); ++i)
 		{
+			unsigned int color;
 			if(flags & TextFlag_Highlight)
-				pixel[i] = MetalBar::s_matchColor;
+				color = MetalBar::s_matchColor;
 			else if(flags & TextFlag_Comment)
-				pixel[i] = MetalBar::s_commentColor;
+				color = MetalBar::s_commentColor;
 			else if( (text[i - column] >= 'A') && (text[i - column] <= 'Z') )
-				pixel[i] = MetalBar::s_upperCaseColor;
+				color = MetalBar::s_upperCaseColor;
 			else
-				pixel[i] = MetalBar::s_characterColor;
+				color = MetalBar::s_characterColor;
+
+			imgBuffer[line*MetalBar::s_barWidth + i] = color;
 		}
 	}
 
 	std::vector<unsigned int>& imgBuffer;
 	MarkedLineList& markedLines;
-	unsigned int* pixel;
 };
 
 void MetalBar::RefreshCodeImg(int barHeight)
@@ -649,7 +637,8 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	if( (m_numLines > barHeight) && (m_codeImgHeight != barHeight) )
 		m_codeImgDirty = true;
 
-	if(!m_codeImg || m_codeImgDirty)
+	// Don't refresh the image while the preview is shown.
+	if(!m_codeImg || (m_codeImgDirty && !g_previewShown))
 	{
 		m_codeImgDirty = false;
 		RefreshCodeImg(barHeight);
