@@ -195,11 +195,11 @@ struct PreviewRenderOp : RenderOperator
 
 	void RenderSpaces(int /*line*/, int /*column*/, int /*count*/) {}
 
-	void RenderCharacters(int line, int column, const wchar_t* text, int len, unsigned int flags)
+	void RenderCharacter(int line, int column, wchar_t chr, unsigned int flags)
 	{
 		RECT wordRect;
 		wordRect.left = column*CodePreview::s_charWidth;
-		wordRect.right = wordRect.left + len*CodePreview::s_charWidth;
+		wordRect.right = wordRect.left + CodePreview::s_charWidth;
 		wordRect.top = line*CodePreview::s_lineHeight;
 		wordRect.bottom = wordRect.top + CodePreview::s_lineHeight;
 
@@ -219,7 +219,7 @@ struct PreviewRenderOp : RenderOperator
 
 		SetTextColor(paintDC, RGB_TO_COLORREF(fgColor));
 		SelectObject(paintDC, font);
-		ExtTextOutW(paintDC, wordRect.left, wordRect.top, ETO_CLIPPED, &imgRect, text, len, 0);
+		ExtTextOutW(paintDC, wordRect.left, wordRect.top, ETO_CLIPPED, &imgRect, &chr, 1, 0);
 	}
 
 	HDC paintDC;
