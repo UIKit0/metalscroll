@@ -48,6 +48,8 @@ static void FlipScaleImagePlainC(unsigned int* dest, int destHeight, const unsig
 		float truncLowY = (float)srcStartY;
 		float firstPixelArea = 1.0f - (lowY - truncLowY);
 		float lastPixelArea = highY - (float)(int)highY;
+		if(lastPixelArea == 0.0f)
+			lastPixelArea = 1.0f;
 
 		for(int j = 0; j < width; ++j)
 		{
@@ -127,6 +129,8 @@ static void FlipScaleImageSSE(unsigned int* dest, int destHeight, const unsigned
 		float areaTmp = 1.0f - (lowY - truncLowY);
 		__m128 firstPixelArea = _mm_load1_ps(&areaTmp);
 		areaTmp = highY - (float)(int)highY;
+		if(areaTmp == 0.0f)
+			areaTmp = 1.0f;
 		__m128 lastPixelArea = _mm_load1_ps(&areaTmp);
 
 		for(int j = 0; j < width; ++j)
