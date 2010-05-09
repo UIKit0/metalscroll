@@ -149,15 +149,9 @@ void STDMETHODCALLTYPE CConnect::OnRegisterView(IVsTextView* view)
 	Log("MetalScroll: Subscribed to view events.\n");
 }
 
-struct ScrollbarHandles
-{
-	HWND		vert;
-	HWND		horiz;
-};
-
 static BOOL CALLBACK FindScrollbars(HWND hwnd, LPARAM param)
 {
-	ScrollbarHandles* handles = (ScrollbarHandles*)param;
+	MetalBar::ScrollbarHandles* handles = (MetalBar::ScrollbarHandles*)param;
 
 	char className[64];
 	GetClassNameA(hwnd, className, _countof(className));
@@ -168,44 +162,44 @@ static BOOL CALLBACK FindScrollbars(HWND hwnd, LPARAM param)
 			handles->vert = hwnd;
 		else
 			handles->horiz = hwnd;
+
+		return TRUE;
+	}
+
+	// ReSharper adds a thing over the VS scrollbar.
+	GetWindowTextA(hwnd, className, _countof(className));
+	if(strcmp(className, "Error Stripe") == 0)
+	{
+		handles->resharper = hwnd;
+		return TRUE;
 	}
 
 	return TRUE;
 }
 
-static LRESULT FAR PASCAL ScrollBarProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
-{
-	MetalBar* bar = (MetalBar*)GetWindowLongPtr(hwnd, GWL_USERDATA);
-	if(!bar)
-		return 0;
-
-	return bar->WndProc(hwnd, message, wparam, lparam);
-}
-
 void CConnect::HookScrollbar(IVsTextView* view)
 {
-	HWND editorHwnd = view->GetWindowHandle();
-	if(!editorHwnd)
+	MetalBar::ScrollbarHandles handles = { 0 };
+
+	handles.editor = view->GetWindowHandle();
+	if(!handles.editor)
 		return;
 
-	ScrollbarHandles bars = { 0 };
-	EnumChildWindows(GetParent(editorHwnd), FindScrollbars, (LPARAM)&bars);
-	if(!bars.vert)
+	EnumChildWindows(GetParent(handles.editor), FindScrollbars, (LPARAM)&handles);
+	if(!handles.vert)
 	{
 		Log("MetalScroll: Vertical scrollbar not found.\n");
 		return;
 	}
 
-	if(GetWindowLongPtr(bars.vert, GWL_USERDATA) != 0)
+	if(GetWindowLongPtr(handles.vert, GWL_USERDATA) != 0)
 	{
 		Log("MetalScroll: Scrollbar has non-null user data.\n");
 		return;
 	}
 
-	WNDPROC oldProc = (WNDPROC)SetWindowLongPtr(bars.vert, GWLP_WNDPROC, (::LONG_PTR)ScrollBarProc);
-	MetalBar* bar = new MetalBar(bars.vert, editorHwnd, bars.horiz, oldProc, view);
-	SetWindowLongPtr(bars.vert, GWL_USERDATA, (::LONG_PTR)bar);
-	Log("MetalScroll: Hooked view 0x%p. Scrollbars: %x, %x. Editor: %x. MetalBar: 0x%p.\n", view, bars.vert, bars.horiz, editorHwnd, bar);
+	MetalBar* bar = new MetalBar(handles, view);
+	Log("MetalScroll: Hooked view 0x%p. Scrollbars: %x, %x. Editor: %x. ReSharper: %x. MetalBar: 0x%p.\n", view, handles.vert, handles.horiz, handles.editor, handles.resharper, bar);
 }
 
 void STDMETHODCALLTYPE CConnect::OnSetFocus(IVsTextView* view)

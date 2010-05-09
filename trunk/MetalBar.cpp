@@ -51,12 +51,9 @@ std::set<MetalBar*> MetalBar::s_bars;
 static CodePreview					g_codePreviewWnd;
 static bool							g_previewShown = false;
 
-MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IVsTextView* view)
+MetalBar::MetalBar(ScrollbarHandles& handles, IVsTextView* view)
 {
-	m_oldProc = oldProc;
-	m_hwnd = vertBar;
-	m_editorWnd = editor;
-	m_horizBar = horizBar;
+	m_handles = handles;
 
 	m_view = view;
 	m_view->AddRef();
@@ -81,7 +78,14 @@ MetalBar::MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IV
 	m_editCmdFilter = CEditCmdFilter::AttachFilter(this);
 
 	s_bars.insert(this);
-	AdjustSize(s_barWidth);
+
+	m_oldProc = (WNDPROC)SetWindowLongPtr(m_handles.vert, GWLP_WNDPROC, (::LONG_PTR)WndProcHelper);
+
+	// Call AdjustSize before setting the user data pointer, so that the resulting WM_WINDOWPOSCHANGING messages
+	// don't call it again for no reason.
+	AdjustSize(s_barWidth, 0);
+
+	SetWindowLongPtr(m_handles.vert, GWL_USERDATA, (::LONG_PTR)this);
 }
 
 MetalBar::~MetalBar()
@@ -106,8 +110,8 @@ MetalBar::~MetalBar()
 
 void MetalBar::RemoveWndProcHook()
 {
-	SetWindowLongPtr(m_hwnd, GWL_USERDATA, 0);
-	SetWindowLongPtr(m_hwnd, GWL_WNDPROC, (::LONG_PTR)m_oldProc);
+	SetWindowLongPtr(m_handles.vert, GWL_USERDATA, 0);
+	SetWindowLongPtr(m_handles.vert, GWL_WNDPROC, (::LONG_PTR)m_oldProc);
 }
 
 void MetalBar::RemoveAllBars()
@@ -118,32 +122,53 @@ void MetalBar::RemoveAllBars()
 		MetalBar* bar = *it;
 		// We must remove the window proc hook before calling AdjustSize(), otherwise WM_SIZE comes and changes the width again.
 		bar->RemoveWndProcHook();
-		bar->AdjustSize(regularBarWidth);
+		bar->AdjustSize(regularBarWidth, 0);
 		delete bar;
 	}
 	s_bars.clear();
 }
 
-void MetalBar::AdjustSize(unsigned int requiredWidth)
+void MetalBar::AdjustSize(unsigned int requiredWidth, WINDOWPOS* vertSbPos)
 {
-	// See if we have the expected width.
+	WINDOWPLACEMENT parentPlacement;
+	GetWindowPlacement(GetParent(m_handles.vert), &parentPlacement);
+	int parentWidth = parentPlacement.rcNormalPosition.right - parentPlacement.rcNormalPosition.left;
+	int parentHeight = parentPlacement.rcNormalPosition.bottom - parentPlacement.rcNormalPosition.top;
+
+	int resharperLeft, resharperWidth;
+	if(m_handles.resharper)
+	{
+		WINDOWPLACEMENT resharperPlacement;
+		resharperPlacement.length = sizeof(resharperPlacement);
+		GetWindowPlacement(m_handles.resharper, &resharperPlacement);
+		resharperLeft = resharperPlacement.rcNormalPosition.left;
+		resharperWidth = resharperPlacement.rcNormalPosition.right - resharperPlacement.rcNormalPosition.left;
+	}
+	else
+	{
+		resharperLeft = 0x7fffffff;
+		resharperWidth = 0;
+	}
+
+	// Figure out our current position.
 	WINDOWPLACEMENT vertBarPlacement;
 	vertBarPlacement.length = sizeof(vertBarPlacement);
-	GetWindowPlacement(m_hwnd, &vertBarPlacement);
+	GetWindowPlacement(m_handles.vert, &vertBarPlacement);
 	int width = vertBarPlacement.rcNormalPosition.right - vertBarPlacement.rcNormalPosition.left;
-	int diff = requiredWidth - width;
-	if(diff == 0)
+	
+	// If we have the expected width and resharper isn't covering us, there's nothing for us to do here.
+	if( (width == (int)requiredWidth) && ((resharperWidth == 0) || (vertBarPlacement.rcNormalPosition.right <= resharperLeft)) )
 		return;
 
 	// Resize the horizontal scroll bar.
 	int horizBarHeight;
-	if(m_horizBar)
+	if(m_handles.horiz)
 	{
 		WINDOWPLACEMENT horizBarPlacement;
 		horizBarPlacement.length = sizeof(horizBarPlacement);
-		GetWindowPlacement(m_horizBar, &horizBarPlacement);
-		horizBarPlacement.rcNormalPosition.right -= diff;
-		SetWindowPlacement(m_horizBar, &horizBarPlacement);
+		GetWindowPlacement(m_handles.horiz, &horizBarPlacement);
+		horizBarPlacement.rcNormalPosition.right = parentWidth - requiredWidth - resharperWidth;
+		SetWindowPlacement(m_handles.horiz, &horizBarPlacement);
 		horizBarHeight = horizBarPlacement.rcNormalPosition.bottom - horizBarPlacement.rcNormalPosition.top;
 	}
 	else
@@ -152,25 +177,35 @@ void MetalBar::AdjustSize(unsigned int requiredWidth)
 	// Resize the editor window.
 	WINDOWPLACEMENT editorPlacement;
 	editorPlacement.length = sizeof(editorPlacement);
-	GetWindowPlacement(m_editorWnd, &editorPlacement);
-	editorPlacement.rcNormalPosition.right -= diff;
-	SetWindowPlacement(m_editorWnd, &editorPlacement);
+	GetWindowPlacement(m_handles.editor, &editorPlacement);
+	editorPlacement.rcNormalPosition.right = parentWidth - requiredWidth - resharperWidth;
+	SetWindowPlacement(m_handles.editor, &editorPlacement);
 
 	// Make the vertical bar wider so we can draw our stuff in it. Also expand its height to fill the gap left when
 	// shrinking the horizontal bar.
-	vertBarPlacement.rcNormalPosition.left -= diff;
-	vertBarPlacement.rcNormalPosition.bottom += horizBarHeight;
-	SetWindowPlacement(m_hwnd, &vertBarPlacement);
+	if(vertSbPos)
+	{
+		vertSbPos->x = parentWidth - requiredWidth - resharperWidth;
+		vertSbPos->cx = requiredWidth;
+		vertSbPos->cy = parentHeight;
+	}
+	else
+	{
+		vertBarPlacement.rcNormalPosition.left = parentWidth - requiredWidth - resharperWidth;
+		vertBarPlacement.rcNormalPosition.right = parentWidth - resharperWidth;
+		vertBarPlacement.rcNormalPosition.bottom = parentHeight;
+		SetWindowPlacement(m_handles.vert, &vertBarPlacement);
+	}
 }
 
 void MetalBar::OnDrag(bool initial)
 {
 	POINT mouse;
 	GetCursorPos(&mouse);
-	ScreenToClient(m_hwnd, &mouse);
+	ScreenToClient(m_handles.vert, &mouse);
 
 	RECT clRect;
-	GetClientRect(m_hwnd, &clRect);
+	GetClientRect(m_handles.vert, &clRect);
 
 	int cursor = mouse.y - clRect.top;
 	int barHeight = clRect.bottom - clRect.top;
@@ -181,14 +216,14 @@ void MetalBar::OnDrag(bool initial)
 	line = (line >= 0) ? line : 0;
 	line = (line < m_numLines) ? line : m_numLines - 1;
 
-	SetScrollPos(m_hwnd, SB_CTL, line, TRUE);
+	SetScrollPos(m_handles.vert, SB_CTL, line, TRUE);
 
-	HWND parent = GetParent(m_hwnd);
+	HWND parent = GetParent(m_handles.vert);
 	WPARAM wparam = (line << 16);
 	wparam |= initial ? SB_THUMBPOSITION : SB_THUMBTRACK;
-	PostMessage(parent, WM_VSCROLL, wparam, (LPARAM)m_hwnd);
+	PostMessage(parent, WM_VSCROLL, wparam, (LPARAM)m_handles.vert);
 	if(initial)
-		PostMessage(parent, WM_VSCROLL, SB_ENDSCROLL, (LPARAM)m_hwnd);
+		PostMessage(parent, WM_VSCROLL, SB_ENDSCROLL, (LPARAM)m_handles.vert);
 }
 
 void MetalBar::OnTrackPreview()
@@ -197,7 +232,7 @@ void MetalBar::OnTrackPreview()
 	GetCursorPos(&mouse);
 
 	RECT clRect;
-	GetWindowRect(m_hwnd, &clRect);
+	GetWindowRect(m_handles.vert, &clRect);
 
 	// Determine the line, taking care of the case when the code image is scaled.
 	int pixelY = clamp<int>(mouse.y - clRect.top, 0, m_codeImgHeight);
@@ -214,7 +249,7 @@ void MetalBar::ShowCodePreview()
 	if(!GetBufferAndText(&buffer, &text, &numLines))
 		return;
 
-	g_codePreviewWnd.Show(m_hwnd, m_view, buffer, text, numLines);
+	g_codePreviewWnd.Show(m_handles.vert, m_view, buffer, text, numLines);
 
 	g_previewShown = true;
 	OnTrackPreview();
@@ -222,8 +257,6 @@ void MetalBar::ShowCodePreview()
 
 LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
-	WNDPROC oldProc = m_oldProc;
-
 	switch(message)
 	{
 		case WM_NCDESTROY:
@@ -250,11 +283,17 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			return 0;
 		}
 
-		case WM_WINDOWPOSCHANGED:
-		case WM_SIZE:
+		case WM_WINDOWPOSCHANGING:
 		{
-			AdjustSize(s_barWidth);
-			break;
+			WINDOWPOS* p = (WINDOWPOS*)lparam;
+			AdjustSize(s_barWidth, p);
+			return 0;
+		}
+
+		case WM_WINDOWPOSCHANGED:
+		{
+			AdjustSize(s_barWidth, 0);
+			return 0;
 		}
 
 		case WM_ERASEBKGND:
@@ -285,7 +324,7 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 			// Call the default window procedure so that the scrollbar stores the position and range internally. Pass
 			// 0 as wparam so it doesn't draw the thumb by itself.
-			LRESULT res = CallWindowProc(oldProc, hwnd, message, 0, lparam);
+			LRESULT res = CallWindowProc(m_oldProc, hwnd, message, 0, lparam);
 			if(wparam)
 			{
 				InvalidateRect(hwnd, 0, TRUE);
@@ -352,7 +391,7 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 		case WM_MBUTTONDOWN:
 		{
-			SetCapture(m_hwnd);
+			SetCapture(m_handles.vert);
 			ShowCodePreview();
 			return 0;
 		}
@@ -409,7 +448,16 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		}
 	}
 
-	return CallWindowProc(oldProc, hwnd, message, wparam, lparam);
+	return CallWindowProc(m_oldProc, hwnd, message, wparam, lparam);
+}
+
+LRESULT FAR PASCAL MetalBar::WndProcHelper(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+{
+	MetalBar* bar = (MetalBar*)GetWindowLongPtr(hwnd, GWL_USERDATA);
+	if(!bar)
+		return 0;
+
+	return bar->WndProc(hwnd, message, wparam, lparam);
 }
 
 bool MetalBar::GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines)
@@ -608,7 +656,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 	blendFunc.AlphaFormat = AC_SRC_ALPHA;
 
 	RECT clRect;
-	GetClientRect(m_hwnd, &clRect);
+	GetClientRect(m_handles.vert, &clRect);
 	int barHeight = clRect.bottom - clRect.top;
 
 	if(!m_backBufferDC)
@@ -643,7 +691,8 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		m_codeImgDirty = false;
 		RefreshCodeImg(barHeight);
 		// Re-arm the refresh timer.
-		SetTimer(m_hwnd, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
+		// FIXME: re-enable this.
+		//SetTimer(m_handles.vert, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
 	}
 
 	// Blit the code image and fill the remaining space with the whitespace color.
@@ -787,8 +836,8 @@ void MetalBar::SaveSettings()
 	{
 		MetalBar* bar = *it;
 		bar->m_codeImgDirty = true;
-		bar->AdjustSize(s_barWidth);
-		InvalidateRect(bar->m_hwnd, 0, 0);
+		bar->AdjustSize(s_barWidth, 0);
+		InvalidateRect(bar->m_handles.vert, 0, 0);
 	}
 
 	// Resize the code preview window.
