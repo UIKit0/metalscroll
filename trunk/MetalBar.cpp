@@ -882,6 +882,22 @@ void MetalBar::HighlightMatchingWords()
 		return;
 	}
 
+	bool allSpaces = true;
+	for(unsigned int i = 0; i < selTextLen; ++i)
+	{
+		if( (m_highlightWord[i] != L'\t') && (m_highlightWord[i] != L' ') )
+		{
+			allSpaces = false;
+			break;
+		}
+	}
+
+	if(allSpaces)
+	{
+		m_highlightWord = (wchar_t*)0;
+		return;
+	}
+
 	int line = 0;
 	int column = 0;
 	for(wchar_t* chr = allText; *chr; ++chr)
