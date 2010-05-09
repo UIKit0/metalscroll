@@ -21,12 +21,19 @@ class CEditCmdFilter;
 class MetalBar
 {
 public:
-	MetalBar(HWND vertBar, HWND editor, HWND horizBar, WNDPROC oldProc, IVsTextView* view);
+	struct ScrollbarHandles
+	{
+		HWND		editor;
+		HWND		vert;
+		HWND		horiz;
+		HWND		resharper;
+	};
+
+	MetalBar(ScrollbarHandles& handles, IVsTextView* view);
 	~MetalBar();
 
 	IVsTextView*					GetView() const { return m_view; }
-	HWND							GetHwnd() const { return m_hwnd; }
-	LRESULT							WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	HWND							GetHwnd() const { return m_handles.vert; }
 
 	static void						Init();
 	static void						Uninit();
@@ -60,10 +67,8 @@ private:
 	static void						RemoveAllBars();
 
 	// Handles and other window-related stuff.
+	ScrollbarHandles				m_handles;
 	WNDPROC							m_oldProc;
-	HWND							m_hwnd;
-	HWND							m_editorWnd;
-	HWND							m_horizBar;
 
 	// Text.
 	IVsTextView*					m_view;
@@ -93,7 +98,7 @@ private:
 	void							OnTrackPreview();
 	void							ShowCodePreview();
 	void							OnPaint(HDC ctrlDC);
-	void							AdjustSize(unsigned int requiredWidth);
+	void							AdjustSize(unsigned int requiredWidth, WINDOWPOS* vertSbPos);
 	void							RemoveWndProcHook();
 
 	bool							GetBufferAndText(IVsTextLines** buffer, BSTR* text, long* numLines);
@@ -102,4 +107,7 @@ private:
 
 	void							PaintLineFlags(unsigned int* img, int line, int imgHeight, unsigned int flags);
 	void							RefreshCodeImg(int barHeight);
+
+	LRESULT							WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+	static LRESULT FAR PASCAL		WndProcHelper(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 };
