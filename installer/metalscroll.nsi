@@ -53,7 +53,7 @@ SubSection "MetalScroll" SecMetalScroll
 		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "UninstallString" "$INSTDIR\MetalScrollUninstall.exe"
 		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "InstallLocation" $INSTDIR
 		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "Publisher" "Griffin Software"
-		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "DisplayVersion" "1.0.7.68"
+		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "DisplayVersion" "1.0.8.70"
 		WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "NoModify" 1
 		WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "NoRepair" 1
 		WriteUninstaller "$INSTDIR\MetalScrollUninstall.exe"
