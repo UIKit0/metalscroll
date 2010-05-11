@@ -1,3 +1,8 @@
+ Version 1.0.8 (revision 70)
+-----------------------------
+  - whitespace is no longer highlighted on alt-double click
+  - added some code which should make it cooperate with ReSharper, if ReSharper would cooperate too
+
  Version 1.0.7 (revision 68)
 -----------------------------
   - added support for word wrapping
