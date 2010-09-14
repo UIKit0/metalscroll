@@ -45,9 +45,9 @@ unsigned int MetalBar::s_codePreviewBg;
 unsigned int MetalBar::s_codePreviewFg;
 unsigned int MetalBar::s_codePreviewWidth;
 unsigned int MetalBar::s_codePreviewHeight;
+unsigned int MetalBar::s_enabled;
 
 std::set<MetalBar*> MetalBar::s_bars;
-bool MetalBar::s_enabled = false;
 
 static CodePreview					g_codePreviewWnd;
 static bool							g_previewShown = false;
@@ -84,7 +84,8 @@ MetalBar::MetalBar(ScrollbarHandles& handles, IVsTextView* view)
 
 	// Call AdjustSize before setting the user data pointer, so that the resulting WM_WINDOWPOSCHANGING messages
 	// don't call it again for no reason.
-	AdjustSize(s_barWidth, 0);
+	if(s_enabled)
+		AdjustSize(s_barWidth, 0);
 
 	SetWindowLongPtr(m_handles.vert, GWL_USERDATA, (::LONG_PTR)this);
 }
@@ -272,6 +273,44 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			break;
 		}
 
+		case (WM_USER + 1):
+		{
+			// This message is sent by the command filter to inform us we should highlight words matching
+			// the current selection.
+			HighlightMatchingWords();
+			m_codeImgDirty = true;
+			InvalidateRect(hwnd, 0, 0);
+			return 0;
+		}
+
+		case WM_RBUTTONUP:
+			if(!s_enabled)
+				break;
+			// Fall through.
+
+		case (WM_USER + 2):
+		{
+			// Right-clicking on the bar or pressing ESC removes the matching word markers. ESC key presses
+			// are sent to us by the command filter as WM_USER+2 messages.
+			CComPtr<IVsTextLines> buffer;
+			HRESULT hr = m_view->GetBuffer(&buffer);
+			if(SUCCEEDED(hr) && buffer)
+			{
+				RemoveWordHighlight(buffer);
+				m_codeImgDirty = true;
+				InvalidateRect(hwnd, 0, 0);
+			}
+			// Don't let the default window procedure see right button up events, or it will display the
+			// Windows scrollbar menu (scroll here, page up, page down etc.).
+			return 0;
+		}
+	}
+
+	if(!s_enabled)
+		return CallWindowProc(m_oldProc, hwnd, message, wparam, lparam);
+
+	switch(message)
+	{
 		case WM_PAINT:
 		{
 			PAINTSTRUCT ps;
@@ -417,34 +456,6 @@ LRESULT MetalBar::WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			KillTimer(hwnd, REFRESH_CODE_TIMER_ID);
 			m_codeImgDirty = true;
 			InvalidateRect(hwnd, 0, 0);
-			return 0;
-		}
-
-		case (WM_USER + 1):
-		{
-			// This message is sent by the command filter to inform us we should highlight words matching
-			// the current selection.
-			HighlightMatchingWords();
-			m_codeImgDirty = true;
-			InvalidateRect(hwnd, 0, 0);
-			return 0;
-		}
-
-		case WM_RBUTTONUP:
-		case (WM_USER + 2):
-		{
-			// Right-clicking on the bar or pressing ESC removes the matching word markers. ESC key presses
-			// are sent to us by the command filter as WM_USER+2 messages.
-			CComPtr<IVsTextLines> buffer;
-			HRESULT hr = m_view->GetBuffer(&buffer);
-			if(SUCCEEDED(hr) && buffer)
-			{
-				RemoveWordHighlight(buffer);
-				m_codeImgDirty = true;
-				InvalidateRect(hwnd, 0, 0);
-			}
-			// Don't let the default window procedure see right button up events, or it will display the
-			// Windows scrollbar menu (scroll here, page up, page down etc.).
 			return 0;
 		}
 	}
@@ -755,6 +766,7 @@ void MetalBar::ResetSettings()
 	s_codePreviewFg = 0xff000000;
 	s_codePreviewWidth = 80;
 	s_codePreviewHeight = 15;
+	s_enabled = TRUE;
 }
 
 bool MetalBar::ReadRegInt(unsigned int* to, HKEY key, const char* name)
@@ -797,6 +809,7 @@ void MetalBar::ReadSettings()
 	ReadRegInt(&s_codePreviewBg, key, "CodePreviewBg");
 	ReadRegInt(&s_codePreviewWidth, key, "CodePreviewWidth");
 	ReadRegInt(&s_codePreviewHeight, key, "CodePreviewHeight");
+	ReadRegInt(&s_enabled, key, "BarEnabled");
 
 	RegCloseKey(key);
 }
@@ -927,9 +940,6 @@ void MetalBar::HighlightMatchingWords()
 
 void MetalBar::Init()
 {
-	if(s_enabled)
-		return;
-
 	ReadSettings();
 
 	InitScaler();
@@ -937,20 +947,36 @@ void MetalBar::Init()
 	OptionsDialog::Init();
 
 	g_codePreviewWnd.Create(g_mainVSHwnd, s_codePreviewWidth, s_codePreviewHeight);
-
-	s_enabled = true;
 }
 
 void MetalBar::Uninit()
 {
-	if(!s_enabled)
-		return;
-
 	g_codePreviewWnd.Destroy();
 
 	RemoveAllBars();
 	CodePreview::Unregister();
 	OptionsDialog::Uninit();
+}
 
-	s_enabled = false;
+void MetalBar::SetBarsEnabled(unsigned int enabled)
+{
+	if(s_enabled == enabled)
+		return;
+
+	s_enabled = enabled;
+	HKEY key;
+	if(RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\Griffin Software\\MetalScroll", 0, 0, 0, KEY_SET_VALUE, 0, &key, 0) == ERROR_SUCCESS)
+	{
+		WriteRegInt(key, "BarEnabled", s_enabled);
+		RegCloseKey(key);
+	}
+
+	int width = enabled ? s_barWidth : GetSystemMetrics(SM_CXVSCROLL);
+	for(std::set<MetalBar*>::iterator it = s_bars.begin(); it != s_bars.end(); ++it)
+	{
+		MetalBar* bar = *it;
+		bar->AdjustSize(width, 0);
+		InvalidateRect(bar->GetHwnd(), 0, TRUE);
+		UpdateWindow(bar->GetHwnd());
+	}
 }
