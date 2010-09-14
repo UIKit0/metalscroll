@@ -53,6 +53,22 @@ bool CConnect::GetTextViewEventsPlug(IConnectionPoint** connPt, IVsTextView* vie
 	return SUCCEEDED(hr) && *connPt;
 }
 
+void CConnect::RegisterCommand(EnvDTE80::Commands2* cmdInterface, const wchar_t* name, const wchar_t* caption, const wchar_t* descr, CmdTriggerFunc handler)
+{
+	CComBSTR nameStr(name);
+	CComBSTR captionStr(caption);
+	CComBSTR descStr(descr);
+	CComPtr<EnvDTE::Command> cmd;
+	long status = EnvDTE::vsCommandStatusSupported | EnvDTE::vsCommandStatusEnabled;
+	EnvDTE80::vsCommandStyle uiStyle = EnvDTE80::vsCommandStylePictAndText;
+	EnvDTE80::vsCommandControlType uiType = EnvDTE80::vsCommandControlTypeButton;
+	cmdInterface->AddNamedCommand2(g_addInInstance, nameStr, captionStr, descStr, VARIANT_TRUE, CComVariant(-1), 0, status, uiStyle, uiType, &cmd);
+
+	std::wstring fullName = L"MetalScroll.Connect.";
+	fullName += name;
+	m_commandHandlers[fullName] = handler;
+}
+
 STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*connectMode*/, IDispatch* addInInst, SAFEARRAY** /*custom*/)
 {
 	Log("MetalScroll: OnConnection()\n");
@@ -108,6 +124,13 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 
 	MetalBar::Init();
 
+	// Register the toggle command.
+	CComQIPtr<EnvDTE::Commands> commands;
+	g_dte->get_Commands(&commands);
+	CComQIPtr<EnvDTE80::Commands2> commands2 = commands;
+
+	RegisterCommand(commands2, L"Toggle", L"Toggle MetalScroll", L"Enables or disables the MetalScroll overview bar", &CConnect::OnToggle);
+
 	Log("MetalScroll: OnConnection() done.\n");
 	return S_OK;
 }
@@ -132,6 +155,9 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 
 void STDMETHODCALLTYPE CConnect::OnRegisterView(IVsTextView* view)
 {
+	if(!MetalBar::IsEnabled())
+		return;
+
 	Log("MetalScroll: New view registered: 0x%p.\n", view);
 
 	// Unfortunately, the window hasn't been created at this point yet, so we can't get the HWND
@@ -223,7 +249,7 @@ void STDMETHODCALLTYPE CConnect::OnSetFocus(IVsTextView* view)
 	CONNECTDATA connData;
 	ULONG numRet;
 	bool found = false;
-	while( SUCCEEDED(enumerator->Next(1, &connData, &numRet)) && (numRet > 0) )
+	while( !found && SUCCEEDED(enumerator->Next(1, &connData, &numRet)) && (numRet > 0) )
 	{
 		if(connData.pUnk == (IVsTextViewEvents*)this)
 		{
@@ -232,4 +258,98 @@ void STDMETHODCALLTYPE CConnect::OnSetFocus(IVsTextView* view)
 		}
 		connData.pUnk->Release();
 	}
+}
+
+STDMETHODIMP CConnect::QueryStatus(BSTR /*bstrCmdName*/, EnvDTE::vsCommandStatusTextWanted NeededText, EnvDTE::vsCommandStatus* pStatusOption, VARIANT* /*pvarCommandText*/)
+{
+	if(NeededText != EnvDTE::vsCommandStatusTextWantedNone)
+		return S_OK;
+
+	*pStatusOption = (EnvDTE::vsCommandStatus)(EnvDTE::vsCommandStatusSupported | EnvDTE::vsCommandStatusEnabled);
+	return S_OK;
+}
+
+STDMETHODIMP CConnect::Exec(BSTR bstrCmdName, EnvDTE::vsCommandExecOption ExecuteOption, VARIANT* /*pvarVariantIn*/, VARIANT* /*pvarVariantOut*/, VARIANT_BOOL* pvbHandled)
+{
+	*pvbHandled = VARIANT_FALSE;
+	if(ExecuteOption != EnvDTE::vsCommandExecOptionDoDefault)
+		return S_OK;
+
+	CmdHandlerMapIt it = m_commandHandlers.find(bstrCmdName);
+	if(it == m_commandHandlers.end())
+		return S_OK;
+
+	CmdTriggerFunc trigger = it->second;
+	(this->*trigger)();
+	*pvbHandled = VARIANT_TRUE;
+	return S_OK;
+}
+
+void CConnect::HookAllScrollbars()
+{
+	CComPtr<IVsUIShellOpenDocument> shellOpenDoc;
+	CComQIPtr<IServiceProvider> sp = g_dte;
+	HRESULT hr = sp->QueryService(SID_SVsUIShellOpenDocument, IID_IVsUIShellOpenDocument, (void**)&shellOpenDoc);
+	if(FAILED(hr))
+		return;
+
+	CComPtr<EnvDTE::Documents> docs;
+	g_dte->get_Documents(&docs);
+
+	long numDocs = 0;
+	hr = docs->get_Count(&numDocs);
+	if(FAILED(hr))
+		return;
+
+	for(int i = 1; i <= numDocs; ++i)
+	{
+		CComPtr<EnvDTE::Document> doc;
+		HRESULT hr = docs->Item(CComVariant(i), &doc);
+		if(FAILED(hr))
+			continue;
+
+		CComBSTR fullName;
+		doc->get_FullName(&fullName);
+
+		CComPtr<IVsUIHierarchy> hierarchy;
+		VSITEMID itemId;
+		CComPtr<IVsWindowFrame> wndFrame;
+		BOOL isOpen;
+		shellOpenDoc->IsDocumentOpen(0, 0, fullName, LOGVIEWID_TextView, 0, &hierarchy, &itemId, &wndFrame, &isOpen);
+		if(!isOpen)
+			continue;
+
+		CComPtr<IVsCodeWindow> codeWnd;
+		hr = wndFrame->QueryViewInterface(IID_IVsCodeWindow, (void**)&codeWnd);
+		if(FAILED(hr))
+			continue;
+
+		IVsTextView* view = 0;
+		hr = codeWnd->GetPrimaryView(&view);
+		if(SUCCEEDED(hr) && view)
+		{
+			HookScrollbar(view);
+			view->Release();
+		}
+
+		view = 0;
+		hr = codeWnd->GetSecondaryView(&view);
+		if(SUCCEEDED(hr) && view)
+		{
+			HookScrollbar(view);
+			view->Release();
+		}
+	}
+}
+
+void CConnect::OnToggle()
+{
+	if(MetalBar::IsEnabled())
+	{
+		MetalBar::Uninit();
+		return;
+	}
+
+	MetalBar::Init();
+	HookAllScrollbars();
 }
