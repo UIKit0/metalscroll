@@ -47,6 +47,7 @@ unsigned int MetalBar::s_codePreviewWidth;
 unsigned int MetalBar::s_codePreviewHeight;
 
 std::set<MetalBar*> MetalBar::s_bars;
+bool MetalBar::s_enabled = false;
 
 static CodePreview					g_codePreviewWnd;
 static bool							g_previewShown = false;
@@ -926,6 +927,9 @@ void MetalBar::HighlightMatchingWords()
 
 void MetalBar::Init()
 {
+	if(s_enabled)
+		return;
+
 	ReadSettings();
 
 	InitScaler();
@@ -933,13 +937,20 @@ void MetalBar::Init()
 	OptionsDialog::Init();
 
 	g_codePreviewWnd.Create(g_mainVSHwnd, s_codePreviewWidth, s_codePreviewHeight);
+
+	s_enabled = true;
 }
 
 void MetalBar::Uninit()
 {
+	if(!s_enabled)
+		return;
+
 	g_codePreviewWnd.Destroy();
 
 	RemoveAllBars();
 	CodePreview::Unregister();
 	OptionsDialog::Uninit();
+
+	s_enabled = false;
 }
