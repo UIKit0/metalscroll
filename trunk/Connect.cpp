@@ -93,8 +93,26 @@ bool CConnect::FindRockScroll()
 		if(FAILED(hr))
 			continue;
 
-		if(_wcsicmp(name, L"rockscroll") == 0)
+		if(_wcsicmp(name, L"rockscroll") != 0)
+			continue;
+
+		VARIANT_BOOL isLoaded = VARIANT_TRUE;
+		addin->get_Connected(&isLoaded);
+		// We usually show these message boxes when VS is loading, and there's a slight chance that they will end up under the splash screen.
+		// In that case people will complain that MetalScroll hangs VS on their system because they won't see that they have to dismiss
+		// a dialog box for it to continue loading. Therefore, we've made the message boxes system modal. It's ugly, but I can't think of
+		// another solution.
+		if(isLoaded)
+		{
+			MessageBoxA(0, "We have detected that RockScroll is loaded.\nPlease remove it if you wish to use MetalScroll.", "MetalScroll", MB_ICONERROR|MB_SYSTEMMODAL);
 			return true;
+		}
+		else
+		{
+			Log("MetalScroll: Rockscroll is installed but not loaded.\n");
+			//MessageBoxA(0, "We have detected that RockScroll is installed but not yet loaded.\nMetalScroll will load now, but if you also load RockScroll, it will probably cause Visual Studio to crash.", "MetalScroll", MB_ICONERROR|MB_SYSTEMMODAL);
+			return false;
+		}
 	}
 
 	return false;
@@ -110,12 +128,6 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 
 	if(FindRockScroll())
 	{
-		// We usually bring up this message box when VS is loading, and there's a slight chance that it ends up under the splash screen.
-		// In that case people will complain that MetalScroll hangs VS on their system because they won't see that they have to dismiss
-		// a dialog box for it to continue loading. Therefore, we've made the message box system modal. It's ugly, but I can't think of
-		// another solution.
-		MessageBoxA(0, "We have detected that RockScroll is installed on this system.\nPlease remove it if you wish to use MetalScroll.", "MetalScroll", MB_ICONERROR|MB_SYSTEMMODAL);
-		Log("MetalScroll: RockScroll found, refusing to load.\n");
 		g_dte.Release();
 		return E_FAIL;
 	}
