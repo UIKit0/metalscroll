@@ -38,6 +38,21 @@ RequestExecutionLevel admin
 
 InstType "Normal install"
 
+!macro DisableRockScroll key
+	!ifdef DISABLEROCK_UNIQUE
+		!undef DISABLEROCK_UNIQUE
+	!endif
+	!define DISABLEROCK_UNIQUE ${__LINE__}
+	
+	ClearErrors
+	ReadRegDWORD $0 HKCU ${key} "LoadBehavior"
+	IfErrors done_${DISABLEROCK_UNIQUE}
+	IntCmpU $0 0 done_${DISABLEROCK_UNIQUE} done_${DISABLEROCK_UNIQUE} +1
+	WriteRegDWORD HKCU ${key} "LoadBehavior" 0
+	
+done_${DISABLEROCK_UNIQUE}:
+!macroend
+
 SubSection "MetalScroll" SecMetalScroll
 	Section "Files" SecFiles
 		SectionIn 1 RO
@@ -47,6 +62,9 @@ SubSection "MetalScroll" SecMetalScroll
 		File "license.rtf"
 		File "..\Release\MetalScroll.dll"
 		RegDLL "$INSTDIR\MetalScroll.dll"
+		
+		!insertmacro DisableRockScroll "Software\Microsoft\VisualStudio\8.0\AddIns\rockscroll.Connect"
+		!insertmacro DisableRockScroll "Software\Microsoft\VisualStudio\9.0\AddIns\rockscroll.Connect"
 		
 		; Uninstaller.
 		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MetalScroll" "DisplayName" "MetalScroll"
