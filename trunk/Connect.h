@@ -92,6 +92,7 @@ private:
 	void						RegisterCommand(EnvDTE80::Commands2* cmdInterface, const wchar_t* name, const wchar_t* caption, const wchar_t* descr, CmdTriggerFunc handler);
 	void						HookAllScrollbars();
 	void						OnToggle();
+	bool						FindRockScroll();
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(Connect), CConnect)

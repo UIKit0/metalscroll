@@ -69,6 +69,37 @@ void CConnect::RegisterCommand(EnvDTE80::Commands2* cmdInterface, const wchar_t*
 	m_commandHandlers[fullName] = handler;
 }
 
+bool CConnect::FindRockScroll()
+{
+	CComPtr<EnvDTE::AddIns> addins;
+	HRESULT hr = g_dte->get_AddIns(&addins);
+	if(FAILED(hr))
+		return false;
+
+	long numAddins = 0;
+	hr = addins->get_Count(&numAddins);
+	if(FAILED(hr))
+		return false;
+
+	for(int i = 1; i <= numAddins; ++i)
+	{
+		CComPtr<EnvDTE::AddIn> addin;
+		hr = addins->Item(CComVariant(i), &addin);
+		if(FAILED(hr))
+			continue;
+
+		CComBSTR name;
+		hr = addin->get_Name(&name);
+		if(FAILED(hr))
+			continue;
+
+		if(_wcsicmp(name, L"rockscroll") == 0)
+			return true;
+	}
+
+	return false;
+}
+
 STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*connectMode*/, IDispatch* addInInst, SAFEARRAY** /*custom*/)
 {
 	Log("MetalScroll: OnConnection()\n");
@@ -76,6 +107,18 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 	HRESULT hr = application->QueryInterface(__uuidof(EnvDTE80::DTE2), (void**)&g_dte);
 	if(FAILED(hr))
 		return hr;
+
+	if(FindRockScroll())
+	{
+		// We usually bring up this message box when VS is loading, and there's a slight chance that it ends up under the splash screen.
+		// In that case people will complain that MetalScroll hangs VS on their system because they won't see that they have to dismiss
+		// a dialog box for it to continue loading. Therefore, we've made the message box system modal. It's ugly, but I can't think of
+		// another solution.
+		MessageBoxA(0, "We have detected that RockScroll is installed on this system.\nPlease remove it if you wish to use MetalScroll.", "MetalScroll", MB_ICONERROR|MB_SYSTEMMODAL);
+		Log("MetalScroll: RockScroll found, refusing to load.\n");
+		g_dte.Release();
+		return E_FAIL;
+	}
 
 	hr = addInInst->QueryInterface(__uuidof(EnvDTE::AddIn), (void**)&g_addInInstance);
 	if(FAILED(hr))
