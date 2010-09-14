@@ -138,7 +138,7 @@ void OptionsDialog::Execute()
 	MetalBar::s_codePreviewBg = m_previewBg.GetColor();
 	MetalBar::s_codePreviewFg = m_previewFg.GetColor();
 	MetalBar::s_cursorColor = (m_cursorColor.GetColor() & 0xffffff) | ((m_cursorTrans & 0xff) << 24);
-	MetalBar::s_barWidth = m_barWidth;
+	MetalBar::s_barWidth = std::max((int)m_barWidth, 8);
 	MetalBar::s_codePreviewWidth = m_codePreviewWidth;
 	MetalBar::s_codePreviewHeight = m_codePreviewHeight;
 	MetalBar::s_requireAltForHighlight = m_requireALT;
