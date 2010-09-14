@@ -691,8 +691,7 @@ void MetalBar::OnPaint(HDC ctrlDC)
 		m_codeImgDirty = false;
 		RefreshCodeImg(barHeight);
 		// Re-arm the refresh timer.
-		// FIXME: re-enable this.
-		//SetTimer(m_handles.vert, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
+		SetTimer(m_handles.vert, REFRESH_CODE_TIMER_ID, REFRESH_CODE_INTERVAL, 0);
 	}
 
 	// Blit the code image and fill the remaining space with the whitespace color.
