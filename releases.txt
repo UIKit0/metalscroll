@@ -1,3 +1,11 @@
+ Version 1.0.9 (revision 77)
+-----------------------------
+  - the minimum scrollbar width is forced to 8
+  - added a command which toggles the visibility of the MetalScroll bar (MetalScroll.Connect.Toggle) 
+  - the add-in refuses to load if Rockscroll is present
+  - the installer disables Rockscroll if it's found
+  - fixed: if the add-in was loaded manually after VS was started, the windows which were already open didn't get a MetalScroll bar 
+
  Version 1.0.8 (revision 70)
 -----------------------------
   - whitespace is no longer highlighted on alt-double click
