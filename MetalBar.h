@@ -37,7 +37,8 @@ public:
 
 	static void						Init();
 	static void						Uninit();
-	static bool						IsEnabled() { return s_enabled; }
+	static unsigned int				IsEnabled() { return s_enabled; }
+	static void						SetBarsEnabled(unsigned int enabled);
 	static void						ResetSettings();
 	static void						SaveSettings();
 
@@ -61,7 +62,7 @@ public:
 
 private:
 	static std::set<MetalBar*>		s_bars;
-	static bool						s_enabled;
+	static unsigned int				s_enabled;
 
 	static bool						ReadRegInt(unsigned int* to, HKEY key, const char* name);
 	static void						WriteRegInt(HKEY key, const char* name, unsigned int val);

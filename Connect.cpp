@@ -131,6 +131,8 @@ STDMETHODIMP CConnect::OnConnection(IDispatch* application, ext_ConnectMode /*co
 
 	RegisterCommand(commands2, L"Toggle", L"Toggle MetalScroll", L"Enables or disables the MetalScroll overview bar", &CConnect::OnToggle);
 
+	HookAllScrollbars();
+
 	Log("MetalScroll: OnConnection() done.\n");
 	return S_OK;
 }
@@ -155,9 +157,6 @@ STDMETHODIMP CConnect::OnDisconnection(ext_DisconnectMode /*removeMode*/, SAFEAR
 
 void STDMETHODCALLTYPE CConnect::OnRegisterView(IVsTextView* view)
 {
-	if(!MetalBar::IsEnabled())
-		return;
-
 	Log("MetalScroll: New view registered: 0x%p.\n", view);
 
 	// Unfortunately, the window hasn't been created at this point yet, so we can't get the HWND
@@ -344,12 +343,6 @@ void CConnect::HookAllScrollbars()
 
 void CConnect::OnToggle()
 {
-	if(MetalBar::IsEnabled())
-	{
-		MetalBar::Uninit();
-		return;
-	}
-
-	MetalBar::Init();
-	HookAllScrollbars();
+	unsigned int enable = !MetalBar::IsEnabled();
+	MetalBar::SetBarsEnabled(enable);
 }
