@@ -92,16 +92,16 @@ void CodePreview::Register()
 	wndClass.lpszClassName = s_className;
 	RegisterClassA(&wndClass);
 
-	s_normalFont = CreateFontA(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FIXED_PITCH|FF_DONTCARE, "Courier New");
-	s_boldFont = CreateFontA(-11, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FIXED_PITCH |FF_DONTCARE, "Courier New");
+	s_normalFont = CreateFontA(-11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, FIXED_PITCH|FF_DONTCARE, 0);
+	s_boldFont = CreateFontA(-11, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, FIXED_PITCH|FF_DONTCARE, 0);
 
 	HDC memDC = CreateCompatibleDC(0);
 	SelectObject(memDC, s_normalFont);
 	TEXTMETRIC metrics;
 	GetTextMetrics(memDC, &metrics);
 	DeleteDC(memDC);
-	
-	s_charWidth = metrics.tmMaxCharWidth;
+
+	s_charWidth = metrics.tmAveCharWidth;
 	s_lineHeight = metrics.tmHeight;
 }
 
