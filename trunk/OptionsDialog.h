@@ -51,6 +51,8 @@ private:
 	unsigned int				m_cursorTrans;
 	unsigned int				m_barWidth;
 	unsigned int				m_requireALT;
+	unsigned int				m_caseSensitive;
+	unsigned int				m_wholeWordOnly;
 	unsigned int				m_codePreviewWidth;
 	unsigned int				m_codePreviewHeight;
 

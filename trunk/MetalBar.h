@@ -55,6 +55,8 @@ public:
 	static unsigned int				s_breakpointColor;
 	static unsigned int				s_bookmarkColor;
 	static unsigned int				s_requireAltForHighlight;
+	static unsigned int				s_caseSensitive;
+	static unsigned int				s_wholeWordOnly;
 	static unsigned int				s_codePreviewBg;
 	static unsigned int				s_codePreviewFg;
 	static unsigned int				s_codePreviewWidth;

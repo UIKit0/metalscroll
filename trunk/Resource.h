@@ -25,6 +25,8 @@
 #define IDC_PREVIEW_HEIGHT              216
 #define IDC_PREVIEW_BG                  217
 #define IDC_PREVIEW_FG                  218
+#define IDC_CASE_SENSITIVE              219
+#define IDC_WHOLE_WORD_ONLY             220
 
 // Next default values for new objects
 // 

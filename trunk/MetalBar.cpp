@@ -41,6 +41,8 @@ unsigned int MetalBar::s_unsavedLineColor;
 unsigned int MetalBar::s_breakpointColor;
 unsigned int MetalBar::s_bookmarkColor;
 unsigned int MetalBar::s_requireAltForHighlight;
+unsigned int MetalBar::s_caseSensitive;
+unsigned int MetalBar::s_wholeWordOnly;
 unsigned int MetalBar::s_codePreviewBg;
 unsigned int MetalBar::s_codePreviewFg;
 unsigned int MetalBar::s_codePreviewWidth;
@@ -762,6 +764,8 @@ void MetalBar::ResetSettings()
 	s_breakpointColor = 0xffff0000;
 	s_bookmarkColor = 0xff0000ff;
 	s_requireAltForHighlight = TRUE;
+	s_caseSensitive = TRUE;
+	s_wholeWordOnly = TRUE;
 	s_codePreviewBg = 0xffffffe1;
 	s_codePreviewFg = 0xff000000;
 	s_codePreviewWidth = 80;
@@ -805,6 +809,8 @@ void MetalBar::ReadSettings()
 	ReadRegInt(&s_breakpointColor, key, "BreakpointColor");
 	ReadRegInt(&s_bookmarkColor, key, "BookmarkColor");
 	ReadRegInt(&s_requireAltForHighlight, key, "RequireALT");
+	ReadRegInt(&s_caseSensitive, key, "CaseSensitive");
+	ReadRegInt(&s_wholeWordOnly, key, "WholeWordOnly");
 	ReadRegInt(&s_codePreviewFg, key, "CodePreviewFg");
 	ReadRegInt(&s_codePreviewBg, key, "CodePreviewBg");
 	ReadRegInt(&s_codePreviewWidth, key, "CodePreviewWidth");
@@ -837,6 +843,8 @@ void MetalBar::SaveSettings()
 	WriteRegInt(key, "BreakpointColor", s_breakpointColor);
 	WriteRegInt(key, "BookmarkColor", s_bookmarkColor);
 	WriteRegInt(key, "RequireALT", s_requireAltForHighlight);
+	WriteRegInt(key, "CaseSensitive", s_caseSensitive);
+	WriteRegInt(key, "WholeWordOnly", s_wholeWordOnly);
 	WriteRegInt(key, "CodePreviewFg", s_codePreviewFg);
 	WriteRegInt(key, "CodePreviewBg", s_codePreviewBg);
 	WriteRegInt(key, "CodePreviewWidth", s_codePreviewWidth);
@@ -926,7 +934,17 @@ void MetalBar::HighlightMatchingWords()
 			continue;
 		}
 
-		if( (wcsncmp(chr, m_highlightWord, selTextLen) == 0) && (chr == allText || IsCppIdSeparator(chr[-1])) && IsCppIdSeparator(chr[selTextLen]) )
+		bool isFound = false;
+		if (MetalBar::s_caseSensitive)
+			isFound = (wcsncmp(chr, m_highlightWord, selTextLen) == 0);
+		else
+			isFound = (_wcsnicmp(chr, m_highlightWord, selTextLen) == 0);
+
+		bool isValidWord = true;
+		if (MetalBar::s_wholeWordOnly)
+			isValidWord = (chr == allText || IsCppIdSeparator(chr[-1])) && IsCppIdSeparator(chr[selTextLen]);
+
+		if( isFound && isValidWord )
 		{
 			buffer->CreateLineMarker(g_highlightMarkerType, line, column, line, column + selTextLen, 0, 0);
 			// Make sure we don't create overlapping markers.
