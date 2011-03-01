@@ -46,6 +46,12 @@ void OptionsDialog::InitDialog(HWND hwnd)
 
 	int state = MetalBar::s_requireAltForHighlight ? BST_CHECKED : BST_UNCHECKED;
 	CheckDlgButton(hwnd, IDC_REQUIRE_ALT, state);
+
+	state = MetalBar::s_caseSensitive ? BST_CHECKED : BST_UNCHECKED;
+	CheckDlgButton(hwnd, IDC_CASE_SENSITIVE, state);
+
+	state = MetalBar::s_wholeWordOnly ? BST_CHECKED : BST_UNCHECKED;
+	CheckDlgButton(hwnd, IDC_WHOLE_WORD_ONLY, state);
 }
 
 int OptionsDialog::GetInt(HWND hwnd, int dlgItem, int defVal)
@@ -64,6 +70,8 @@ void OptionsDialog::OnOK(HWND hwnd)
 	m_codePreviewHeight = GetInt(hwnd, IDC_PREVIEW_HEIGHT, MetalBar::s_codePreviewHeight);
 
 	m_requireALT = (IsDlgButtonChecked(hwnd, IDC_REQUIRE_ALT) == BST_CHECKED);
+	m_caseSensitive = (IsDlgButtonChecked(hwnd, IDC_CASE_SENSITIVE) == BST_CHECKED);
+	m_wholeWordOnly = (IsDlgButtonChecked(hwnd, IDC_WHOLE_WORD_ONLY) == BST_CHECKED);
 }
 
 INT_PTR CALLBACK OptionsDialog::DlgProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -142,6 +150,8 @@ void OptionsDialog::Execute()
 	MetalBar::s_codePreviewWidth = m_codePreviewWidth;
 	MetalBar::s_codePreviewHeight = m_codePreviewHeight;
 	MetalBar::s_requireAltForHighlight = m_requireALT;
+	MetalBar::s_caseSensitive = m_caseSensitive;
+	MetalBar::s_wholeWordOnly = m_wholeWordOnly;
 
 	MetalBar::SaveSettings();
 }
