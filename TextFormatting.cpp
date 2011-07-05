@@ -23,7 +23,13 @@ extern long							g_highlightMarkerType;
 extern CComPtr<IVsTextManager>		g_textMgr;
 
 static const GUID					g_cppLangGUID		= { 0xB2F072B0, 0xABC1, 0x11D0, { 0x9D, 0x62, 0x00, 0xC0, 0x4F, 0xD9, 0xDF, 0xD9 } };
+
+//															 {694DD9B6   -B865   -4C5B     -AD    85   -86    35    6E    9C    88    DC}
 static const GUID					g_csharpLangGUID	= { 0x694DD9B6, 0xB865, 0x4C5B, { 0xAD, 0x85, 0x86, 0x35, 0x6E, 0x9C, 0x88, 0xDC } };
+
+//															 {21feefb5   -ace1   -4461     -ba    7c   -6f    66    45    74    45    fd}
+static const GUID					g_uscriptGUID		= { 0x21feefb5, 0xace1, 0x4461, { 0xba, 0x7c, 0x6f, 0x66, 0x45, 0x74, 0x45, 0xfd } };
+
 
 struct Highlight
 {
@@ -276,7 +282,10 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
 	{
 		tabSize = langPrefs.uTabSize;
-		isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID);
+		isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || 
+							InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID) ||
+							InlineIsEqualGUID(langPrefs.guidLang, g_uscriptGUID);
+
 		if(langPrefs.fWordWrap)
 		{
 			long min, max, pageWidth, pos;
