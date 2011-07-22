@@ -273,18 +273,32 @@ static void GetHighlights(LineList& lines, IVsTextLines* buffer, HighlightList& 
 	ProcessLineMarkers(buffer, g_highlightMarkerType, AddHighlightOp(lines, storage));
 }
 
+typedef bool(*IsKeywordFnPtr)(const wchar_t* c, unsigned int l);
+bool IsUscriptKeyword(const wchar_t* c, unsigned int l);
+
 int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer, const wchar_t* text, int numLines)
 {
 	LANGPREFERENCES langPrefs;
 	int wrapAfter = INT_MAX;
 	int tabSize = 4;
+	
 	bool isCppLikeLanguage = false;
+	bool isUScript = false;
+
+	IsKeywordFnPtr keywordFn = 0;
+
 	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
 	{
 		tabSize = langPrefs.uTabSize;
+		isUScript = InlineIsEqualGUID(langPrefs.guidLang, g_uscriptGUID);
 		isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || 
 							InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID) ||
-							InlineIsEqualGUID(langPrefs.guidLang, g_uscriptGUID);
+							isUScript;
+		if (isUScript)
+			keywordFn = IsUscriptKeyword;
+		else if (isCppLikeLanguage)
+			keywordFn = IsCppKeyword;
+
 
 		if(langPrefs.fWordWrap)
 		{
@@ -438,7 +452,7 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 						while(!IsCppIdSeparator(*keywordEnd))
 							++keywordEnd;
 						int len = int(keywordEnd - chr);
-						inKeyword = IsCppKeyword(chr, len);
+						inKeyword = keywordFn(chr, len);
 					}
 					else if(inKeyword && IsCppIdSeparator(chr[0]))
 						inKeyword = false;
