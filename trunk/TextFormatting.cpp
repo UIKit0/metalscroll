@@ -290,15 +290,14 @@ int RenderText(RenderOperator& renderOp, IVsTextView* view, IVsTextLines* buffer
 	if( SUCCEEDED(buffer->GetLanguageServiceID(&langPrefs.guidLang)) && SUCCEEDED(g_textMgr->GetUserPreferences(0, 0, &langPrefs, 0)) )
 	{
 		tabSize = langPrefs.uTabSize;
-		isUScript = InlineIsEqualGUID(langPrefs.guidLang, g_uscriptGUID);
+		isUScript = InlineIsEqualGUID(langPrefs.guidLang, g_uscriptGUID) ? true : false;
 		isCppLikeLanguage = InlineIsEqualGUID(langPrefs.guidLang, g_cppLangGUID) || 
 							InlineIsEqualGUID(langPrefs.guidLang, g_csharpLangGUID) ||
 							isUScript;
-		if (isUScript)
+		if(isUScript)
 			keywordFn = IsUscriptKeyword;
-		else if (isCppLikeLanguage)
+		else if(isCppLikeLanguage)
 			keywordFn = IsCppKeyword;
-
 
 		if(langPrefs.fWordWrap)
 		{
