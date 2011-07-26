@@ -1,3 +1,8 @@
+ Version 1.0.11 (revision 83)
+-----------------------------
+ - support for UnrealScript by Thaddaeus Frogley
+ - "case sensitive" and "whole word" checkboxes in the options dialog by Brook Jones
+
  Version 1.0.10 (revision 79)
 -----------------------------
  - fixed excessive spacing around keywords and highlighted text in the code preview window on Windows 7
